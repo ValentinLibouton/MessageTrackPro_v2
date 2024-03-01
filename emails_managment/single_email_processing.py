@@ -5,6 +5,22 @@ import os
 
 
 def extract_attachments(file_path, destination_root, subdir=None):
+    """
+    Extract attachments from an email file and save them to a specified directory.
+
+    This function parses an email file, extracts all attachments, and saves them
+    to a subdirectory within a given root directory. If the subdirectory is not
+    specified, it is generated using a unique identifier derived from the email
+    content. The function returns the paths to the saved attachments, their names,
+    and the subdirectory used.
+
+    :param file_path: Path to the email file from which to extract attachments.
+    :param destination_root: Root directory where the attachments will be saved.
+    :param subdir: Optional subdirectory within the root for saving attachments.
+                   If None, a unique subdirectory is generated.
+    :return: A tuple containing a list of file paths to the saved attachments,
+             a list of attachment file names, and the name of the subdirectory used.
+    """
     file_path_attachments = []
     attachment_names = []
 
@@ -30,6 +46,21 @@ def extract_attachments(file_path, destination_root, subdir=None):
 
 
 def extract_email_data(file_path, with_attachments=False):
+    """
+    Extracts data from an email file and optionally includes attachment information.
+
+    This function parses an email file to extract basic information such as sender,
+    recipient, subject, date, and body. If with_attachments is True, it also extracts
+    attachments using extract_attachments function and includes their information.
+    The function returns a dictionary containing the extracted email data and,
+    if applicable, attachment data.
+
+    :param file_path: Path to the email file from which to extract data.
+    :param with_attachments: Boolean indicating whether to extract and include
+                             attachment information. Defaults to False.
+    :return: A dictionary with extracted email data. If with_attachments is True,
+             it also includes lists of attachment names and file paths.
+    """
     # ToDo: Check that the id is unique when there are multiple attachments
     with open(file_path, 'rb') as f:
         msg = BytesParser(policy=default).parse(f)
