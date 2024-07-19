@@ -6,8 +6,17 @@ import base64
 from bs4 import BeautifulSoup
 import quopri
 import re
+import hashlib
+import time
 # Project imports
 from database_managment import database_utils
+
+
+
+#######################################################
+# Code below need to be implemented in class EmailProcessing !
+#######################################################
+
 
 def decode_content(part):
     """
@@ -179,9 +188,11 @@ def decode_base64(data):
     except base64.binascii.Error:
         return "Base64 decoding error"
 
+
 def decode_quoted_printable(data):
     # ToDo: Unused !
     return quopri.decodestring(data).decode('utf-8', errors='ignore')
+
 
 def decode_html(data):
     # ToDo: Unused !
