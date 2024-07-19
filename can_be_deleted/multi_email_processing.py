@@ -2,7 +2,7 @@
 import os
 import glob
 # Project imports
-from emails_managment import single_email_processing
+from can_be_deleted import single_email_processing
 
 
 def find_email_files(directory_path):

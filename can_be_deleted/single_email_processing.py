@@ -6,11 +6,8 @@ import base64
 from bs4 import BeautifulSoup
 import quopri
 import re
-import hashlib
-import time
 # Project imports
-from database_managment import database_utils
-
+from can_be_deleted import database_utils
 
 
 #######################################################
