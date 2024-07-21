@@ -1,4 +1,4 @@
-import sys
+import email.utils
 from email.parser import BytesParser
 from email.policy import default
 import os
@@ -9,8 +9,8 @@ import re
 from email.utils import parseaddr, getaddresses
 import hashlib
 import time
-from datetime import timedelta
-# import pandas as pd
+import pytz
+from datetime import datetime, timedelta
 import polars as pl
 import mailbox
 from tqdm import tqdm
@@ -25,6 +25,46 @@ def extract_name_and_email(email_str):
 def extract_multiple_names_and_emails(email_str):
     addresses = getaddresses([email_str])
     return [{'name': name, 'email': email} for name, email in addresses]
+def convert_date_to_datetime(date_str, target_tz="Europe/Brussels"):
+    if date_str is None:
+        return None
+
+    parsed_date = email.utils.parsedate(date_str)
+    if parsed_date is None:
+        return None
+
+    date_obj = datetime(*parsed_date[:6])
+    return date_obj
+
+
+def split_names_and_emails(addresses, string_cleaning=True):
+    if addresses is None:
+        return None, None
+    names = []
+    emails = []
+    for d in addresses:
+        name = d.get('name', None)
+        email = d.get('email', None)
+        if string_cleaning:
+            name = clean_string(s=name)
+            email = clean_string(s=email)
+        names.append(name)
+        emails.append(email)
+    return names, emails
+
+def clean_string(s):
+    if s is None:
+        return None
+    s = s.strip()
+    while ((s.startswith('"') and s.endswith('"')) or
+           (s.startswith("'") and s.endswith("'"))):
+        if s.startswith("'") and s.endswith("'"):
+            s = s[1:-1]
+        elif s.startswith('"') and s.endswith('"'):
+            s = s[1:-1]
+        s = s.strip()
+    return s
+
 
 def hash_file(filepath):
     sha256 = hashlib.sha256()
@@ -79,9 +119,14 @@ def store_email(data, filepath, with_attachments):
     else:
         body = decode_content(msg)
     from_name, from_email = extract_name_and_email(msg['from'])
-    to_addresses = extract_multiple_names_and_emails(msg['to']) if msg['to'] else []
-    cc_addresses = extract_multiple_names_and_emails(msg['cc']) if msg['cc'] else []
-    bcc_addresses = extract_multiple_names_and_emails(msg['bcc']) if msg['bcc'] else []
+    to_addresses = extract_multiple_names_and_emails(msg['to']) if msg['to'] else None
+    to_names, to_emails = split_names_and_emails(to_addresses)
+    cc_addresses = extract_multiple_names_and_emails(msg['cc']) if msg['cc'] else None
+    cc_names, cc_emails = split_names_and_emails(cc_addresses)
+    bcc_addresses = extract_multiple_names_and_emails(msg['bcc']) if msg['bcc'] else None
+    bcc_names, bcc_emails = split_names_and_emails(bcc_addresses)
+
+    date_obj = convert_date_to_datetime(msg['date'])
 
     data = {
         'filepath': filepath,
@@ -89,14 +134,15 @@ def store_email(data, filepath, with_attachments):
         'from': msg['from'],
         'from_name': from_name,
         'from_email': from_email,
-        'to': msg['to'],
-        'to_splited': to_addresses,
-        'cc': msg['cc'] if msg['cc'] else '',
-        'cc_splited': cc_addresses,
-        'bcc': msg['bcc'] if msg['bcc'] else '',
-        'bcc_splited': bcc_addresses,
+        'to_names': to_names,
+        'to_emails': to_emails,
+        'cc_name': cc_names,
+        'cc_emails': cc_emails,
+        'bcc_names': bcc_names,
+        'bcc_emails': bcc_emails,
         'subject': msg['subject'],
         'date': msg['date'],
+        'date_obj': date_obj, # ToDo test in progress ...
         'body': body,
         'attachments': attachments
     }
