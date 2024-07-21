@@ -6,6 +6,7 @@ import base64
 from bs4 import BeautifulSoup
 import quopri
 import re
+from email.utils import parseaddr, getaddresses
 import hashlib
 import time
 from datetime import timedelta
@@ -14,8 +15,111 @@ import polars as pl
 import mailbox
 from tqdm import tqdm
 import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from tabulate import tabulate
 
+def extract_name_and_email(email_str):
+    name, email = parseaddr(email_str)
+    return name, email
+
+def extract_multiple_names_and_emails(email_str):
+    addresses = getaddresses([email_str])
+    return [{'name': name, 'email': email} for name, email in addresses]
+
+def hash_file(filepath):
+    sha256 = hashlib.sha256()
+    with open(filepath, 'rb') as f:
+        for block in iter(lambda: f.read(4096), b''):
+            sha256.update(block)
+    return sha256.hexdigest()
+
+def hash_message(msg):
+    msg_bytes = msg.as_bytes()
+    return hashlib.sha256(msg_bytes).hexdigest()
+
+def decode_content(part):
+    content_type = part.get_content_type()
+    content_disposition = part.get("Content-Disposition", None)
+
+    if content_type in ["text/plain", "text/html"] and (
+            content_disposition is None or "inline" in content_disposition):
+        payload = part.get_payload(decode=True)
+        charset = part.get_content_charset() or 'utf-8'  # Use the charset specified in the part, or default to 'utf-8'
+        try:
+            return payload.decode(charset, errors="replace")
+        except LookupError:
+            return payload.decode('utf-8', errors="replace")
+    return None
+
+
+def store_email(data, filepath, with_attachments):
+    if not data:
+        with open(filepath, 'rb') as f:
+            msg = BytesParser(policy=default).parse(f)
+    else:
+        msg = data
+    id = hash_message(msg=msg)
+
+    attachments = []
+    body = ""
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_maintype() == 'multipart':
+                continue  # Skip multipart container, go deeper
+            content = decode_content(part)
+            if content:
+                body = content  # Return the first text content found
+            if with_attachments and part.get_content_disposition() == 'attachment':
+                filename = part.get_filename()
+                content = part.get_payload(decode=True)
+                attachments.append({
+                    'filename': filename,
+                    'content': content
+                })
+    else:
+        body = decode_content(msg)
+    from_name, from_email = extract_name_and_email(msg['from'])
+    to_addresses = extract_multiple_names_and_emails(msg['to']) if msg['to'] else []
+    cc_addresses = extract_multiple_names_and_emails(msg['cc']) if msg['cc'] else []
+    bcc_addresses = extract_multiple_names_and_emails(msg['bcc']) if msg['bcc'] else []
+
+    data = {
+        'filepath': filepath,
+        'filename': os.path.basename(filepath),
+        'from': msg['from'],
+        'from_name': from_name,
+        'from_email': from_email,
+        'to': msg['to'],
+        'to_splited': to_addresses,
+        'cc': msg['cc'] if msg['cc'] else '',
+        'cc_splited': cc_addresses,
+        'bcc': msg['bcc'] if msg['bcc'] else '',
+        'bcc_splited': bcc_addresses,
+        'subject': msg['subject'],
+        'date': msg['date'],
+        'body': body,
+        'attachments': attachments
+    }
+    return id, data
+
+def process_file(file_type, filepath, with_attachments):
+    email_dict = {}
+    if file_type == ".eml" or file_type == ".OUTLOOK.COM":
+        id, data = store_email(None, filepath=filepath, with_attachments=with_attachments)
+        email_dict[id] = [data]
+    elif file_type == ".mbox":
+        try:
+            mbox = mailbox.mbox(path=filepath)
+            for msg in mbox:
+                id, data = store_email(data=msg, filepath=filepath, with_attachments=with_attachments)
+                if id not in email_dict:
+                    email_dict[id] = []
+                email_dict[id].append(data)
+        except Exception as e:
+            print(f"Error reading mbox file {filepath}: {e}")
+    else:
+        raise NotImplementedError
+    return email_dict
 
 class EmailProcessing:
     def __init__(self, path, with_attachments=False):
@@ -69,116 +173,30 @@ class EmailProcessing:
             elif file.endswith('.mbox'):
                 self.__filepath_dict.setdefault('.mbox', []).append(file_path)
 
-    def __hash_file(self, filepath):
-        sha256 = hashlib.sha256()
-        with open(filepath, 'rb') as f:
-            for block in iter(lambda: f.read(4096), b''):
-                sha256.update(block)
-        return sha256.hexdigest()
-
-    def __hash_message(self, msg):
-        msg_bytes = msg.as_bytes()
-        return hashlib.sha256(msg_bytes).hexdigest()
-
     def __file_processing(self):
         start_time = time.time()
         total_files = sum(len(filepaths) for filepaths in self.__filepath_dict.values())
-        with tqdm(total=total_files, desc="Processing files", file=sys.stdout, leave=True) as pbar:
-            for file_type, filepaths in self.__filepath_dict.items():
-                tqdm.write(f"Processing {file_type} files")
-                sys.stdout.flush()
-                if file_type == ".eml" or file_type == ".OUTLOOK.COM":
+
+        with ProcessPoolExecutor() as executor:
+            futures = []
+            with tqdm(total=total_files, desc="Processing files", file=sys.stdout, leave=True) as pbar:
+                for file_type, filepaths in self.__filepath_dict.items():
                     for filepath in filepaths:
-                        id, data = self.__store_email(None, filepath=filepath)
-                        self.__build_email_dict(id=id, data=data)
-                        pbar.update(1)
-                        pbar.refresh()
-                        sys.stdout.flush()
-                elif file_type == ".mbox":
-                    for filepath in filepaths:
-                        try:
-                            tqdm.write(f"Processing mbox file: {filepath}")
-                            sys.stdout.flush()
-                            mbox = mailbox.mbox(path=filepath)
-                            total_msgs = len(mbox)
-                            sys.stdout.flush()
-                            for msg in mbox:
-                                id, data = self.__store_email(data=msg, filepath=filepath)
-                                self.__build_email_dict(id=id, data=data)
-                                sys.stdout.flush()
-                            pbar.update(1)
-                            pbar.refresh()
-                            sys.stdout.flush()
-                        except Exception as e:
-                            tqdm.write(f"Error reading mbox file {filepath}: {e}")
-                            sys.stdout.flush()
-                else:
-                    raise NotImplementedError
-                pbar.update(1)
-                pbar.refresh()
-                sys.stdout.flush()
+                        futures.append(executor.submit(process_file, file_type, filepath, self.with_attachments))
+
+                for future in as_completed(futures):
+                    result = future.result()
+                    for id, data in result.items():
+                        if id not in self.__email_dict:
+                            self.__email_dict[id] = []
+                        self.__email_dict[id].extend(data)
+                    pbar.update(1)
+                    pbar.refresh()
+                    sys.stdout.flush()
+
         end_time = time.time()
         self.__time_dict['Time for file processing'] = end_time - start_time
-
-    def __decode_content(self, part):
-        content_type = part.get_content_type()
-        content_disposition = part.get("Content-Disposition", None)
-
-        if content_type in ["text/plain", "text/html"] and (
-                content_disposition is None or "inline" in content_disposition):
-            payload = part.get_payload(decode=True)
-            charset = part.get_content_charset() or 'utf-8'  # Use the charset specified in the part, or default to 'utf-8'
-            try:
-                return payload.decode(charset, errors="replace")
-            except LookupError:
-                return payload.decode('utf-8', errors="replace")
-        return None
-
-    def __store_email(self, data, filepath):
-        if not data:
-            with open(filepath, 'rb') as f:
-                msg = BytesParser(policy=default).parse(f)
-        else:
-            msg = data
-        id = self.__hash_message(msg=msg)
-
-        attachments = []
-        body = ""
-        if msg.is_multipart():
-            for part in msg.walk():
-                if part.get_content_maintype() == 'multipart':
-                    continue  # Skip multipart container, go deeper
-                content = self.__decode_content(part)
-                if content:
-                    body = content  # Return the first text content found
-                if self.with_attachments and part.get_content_disposition() == 'attachment':
-                    filename = part.get_filename()
-                    content = part.get_payload(decode=True)
-                    attachments.append({
-                        'filename': filename,
-                        'content': content
-                    })
-        else:
-            body = self.__decode_content(msg)
-
-        data = {
-            'filepath': filepath,
-            'filename': os.path.basename(filepath),
-            'from': msg['from'],
-            'to': msg['to'],
-            'cc': msg['cc'] if msg['cc'] else '',
-            'bcc': msg['bcc'] if msg['bcc'] else '',
-            'subject': msg['subject'],
-            'date': msg['date'],
-            'body': body,
-            'attachments': attachments
-        }
-        return id, data
-
-    def __build_email_dict(self, id, data):
-        if id not in self.__email_dict:
-            self.__email_dict[id] = []
-        self.__email_dict[id].append(data)
+        sys.stdout.flush()
 
     def __build_email_df(self):
         start_time = time.time()
@@ -193,6 +211,7 @@ class EmailProcessing:
                 row.update(info)
                 data.append(row)
         df = pl.DataFrame(data)
+
         end_time = time.time()
         self.__time_dict['Time for building email dataframe'] = end_time - start_time
         return df

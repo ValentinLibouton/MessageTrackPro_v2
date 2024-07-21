@@ -17,6 +17,6 @@ def paths_to_dict():
 if __name__ == "__main__":
     path = paths_to_dict()['emails_eml']
     ep = EmailProcessing(path=path, with_attachments=True)
-    df = ep.get_emails()
+    df = ep.get_emails(limit=100)
     print(df)
     print(ep.log_execution_time)
