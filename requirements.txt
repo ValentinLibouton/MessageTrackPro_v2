@@ -3,5 +3,3 @@ jupyter
 tabulate
 polars
 tqdm
-cython
-aiofiles
