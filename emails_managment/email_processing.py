@@ -25,50 +25,17 @@ def extract_name_and_email(email_str):
 def extract_multiple_names_and_emails(email_str):
     addresses = getaddresses([email_str])
     return [{'name': name, 'email': email} for name, email in addresses]
-def convert_date_to_datetime(date_str, target_tz="Europe/Brussels"):
-    if date_str is None:
-        return None
-
-    parsed_date = email.utils.parsedate(date_str)
-    if parsed_date is None:
-        return None
-    #return str(parsed_date)
-
-    date_tuple = parsed_date[:9]
-    offset = parsed_date[9] if len(parsed_date) > 9 else 0
-
-    date_obj = datetime(*date_tuple[:6])
-
-    if is_daylight_saving(date_obj, target_tz):
-        season_offset = 2 * 3600
-    else:
-        season_offset = 1 * 3600
-
-    if offset == 0:
-        date_obj = date_obj + timedelta(seconds=season_offset)
-    else:
-        date_obj = date_obj - timedelta(seconds=offset)
-
-    # Ajouter le fuseau horaire UTC
-    date_obj = date_obj.replace(tzinfo=pytz.utc)
-
-    # Convertir l'objet datetime au fuseau horaire désiré
-    target_timezone = pytz.timezone(target_tz)
-    date_obj = date_obj.astimezone(target_timezone)
-
-    return date_obj
 
 def is_daylight_saving(date, timezone='Europe/Brussels'):
     tz = pytz.timezone(timezone)
     try:
         localized_date = tz.localize(date, is_dst=None)
     except pytz.AmbiguousTimeError:
-        localized_date = tz.localize(date, is_dst=True)
+        localized_date = tz.localize(date, is_dst=False)
     is_dst = localized_date.dst() != timedelta(0)
     return is_dst
 
-def date(date_str, target_tz="Europe/Brussels"):
-    #print(f"Date str: {date_str}")
+def convert_date_to_datetime(date_str, target_tz="Europe/Brussels"):
     parsed_date = email.utils.parsedate(date_str)
     if parsed_date is None:
         return None
@@ -78,26 +45,46 @@ def date(date_str, target_tz="Europe/Brussels"):
         season_offset = 2 * 3600
     else:
         season_offset = 1 * 3600
-    tz_dict = {
-        '+0200': 0,         # 20210907_154518.eml str to date_obj fait +2 et ne devrait pas, doit faire +0
-        '+0100': 0,          # 20190130_122026.eml str to date_obj fait +1 et ne devrait pas, doit faire +0
-        '+0000': season_offset,
-        'GMT': 3600,
-        '+0800': 8*3600 - season_offset,
-        '+0700': 7*3600 - season_offset,
-        '-0800': 8*3600 + season_offset,
-        '-0700': -7*3600 - season_offset
+    time_shift_in_seconds = {
+        '+1200': -12 * 3600,
+        '+1100': -11 * 3600,
+        '+1000': -10 * 3600,
+        '+0930': -9.5 * 3600,  # Australia
+        '+0900': -9 * 3600,
+        '+0845': 8.75 * 3600,  # Australia
+        '+0800': -8 * 3600,
+        '+0700': -7 * 3600,
+        '+0600': -6 * 3600,
+        '+0530': -5.5 * 3600,  # India
+        '+0500': -5 * 3600,
+        '+0400': -4 * 3600,
+        '+0300': -3 * 3600,
+        '+0200': -2 * 3600,
+        '+0100': -1 * 3600,
+        '+0000': 0,
+        '-0000': 0,
+        '-0100': 1 * 3600,
+        '-0200': 2 * 3600,
+        '-0300': 3 * 3600,
+        '-0400': 4 * 3600,
+        '-0500': 5 * 3600,
+        '-0600': 6 * 3600,
+        '-0700': 7 * 3600,
+        '-0800': 8 * 3600,
+        '-0900': 9 * 3600,
+        '-1000': 10 * 3600,
+        '-1100': 11 * 3600,
+        '-1200': 12 * 3600,
+
     }
-    for substring, offset in tz_dict.items():
+    for substring, offset in time_shift_in_seconds.items():
         if substring in date_str:
-            # adapter la date de départ en faisant + la valeur du dictionnaire
-            date_obj = date_obj + timedelta(seconds=offset)
+            date_obj = date_obj + timedelta(seconds=offset + season_offset)
     target_timezone = pytz.timezone(target_tz)
     date_obj = date_obj.replace(tzinfo=pytz.utc)
     date_obj = date_obj.astimezone(target_timezone)
 
     return date_obj
-
 
 
 def split_names_and_emails(addresses, string_cleaning=True):
@@ -190,30 +177,23 @@ def store_email(data, filepath, with_attachments):
     bcc_names, bcc_emails = split_names_and_emails(bcc_addresses)
 
     date_obj = convert_date_to_datetime(msg['date'])
-    date_from_filename = os.path.basename(filepath)[9:-4]
-    if len(date_from_filename) == 6:
-        date_from_filename = f"{date_from_filename[:2]}:{date_from_filename[2:4]}:{date_from_filename[4:]}"
-    date_ = date(msg['Date'])
 
     data = {
-        #'filepath': filepath,
+        'filepath': filepath,
         'filename': os.path.basename(filepath),
-        'date_from_filename': date_from_filename,
-        #'from': msg['from'],
-        #'from_name': from_name,
-        #'from_email': from_email,
-        #'to_names': to_names,
-        #'to_emails': to_emails,
-        #'cc_name': cc_names,
-        #'cc_emails': cc_emails,
-        #'bcc_names': bcc_names,
-        #'bcc_emails': bcc_emails,
-        #'subject': msg['subject'],
-        'date': str(msg['date']),
-        #'parsed_date': date_obj,
-        'date_obj': date_, # ToDo test in progress ...
-        #'body': body,
-        #'attachments': attachments
+        'from': msg['from'],
+        'from_name': from_name,
+        'from_email': from_email,
+        'to_names': to_names,
+        'to_emails': to_emails,
+        'cc_name': cc_names,
+        'cc_emails': cc_emails,
+        'bcc_names': bcc_names,
+        'bcc_emails': bcc_emails,
+        'subject': msg['subject'],
+        'date_obj': date_obj,
+        'body': body,
+        'attachments': attachments
     }
     return id, data
 
