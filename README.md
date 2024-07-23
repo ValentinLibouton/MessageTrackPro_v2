@@ -3,19 +3,22 @@ Revolutionize your communications management with Message Track Pro<br>
 Status: `in progress`<br>
 
 ## Update
-- **03/03/2024**: single_email_processing: optimized retrieval of email body text
-- **03/03/2024**: multi_email_processing: manages *.eml files sets
-- **01/03/2024**: database_utils: creation of the db key generation function
-- **01/03/2024**: single_email_processing: improved e-mail data and attachment extraction functions
+- **07/23/2024**: Created a list of dictionaries with `EmailProcessing` containing all emails
+- **07/23/2024**: Created a class `EmailDatabase` for managing DB access
+- **07/23/2024**: Developed code for inserting emails into the DB
+
 
 ## Next tasks
-1. multi_email_processing (directory of *.mbox files)
+1. Retrieve email data from the DB
 _____________________________________________________________________
 # Implementation overview
 ## Emails management
-- [ ] Extract datas from eml file
-- [ ] Transform datas
-- [ ] Load data email in DB
+- [X] Extract datas from eml file
+- [X] Transform datas
+- [X] Load data email into DB
+- [ ] Retrive email data from DB
+- [ ] Filter for advanced searching
+- [ ] Manage attachment files
 
 ## Sms / Mms managment
 - [ ] *not yet implemented*
