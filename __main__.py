@@ -1,5 +1,5 @@
 from emails_managment.email_processing import EmailProcessing
-
+from database_managment.email_database import *
 
 def paths_to_dict():
     """This is a temporary function for project development..."""
@@ -17,6 +17,6 @@ def paths_to_dict():
 if __name__ == "__main__":
     path = paths_to_dict()['emails_eml']
     ep = EmailProcessing(path=path, with_attachments=True)
-    df = ep.get_emails(limit=100)
-    print(df)
+    emails = ep.get_emails_list
+    process_emails(emails=emails)
     print(ep.log_execution_time)
