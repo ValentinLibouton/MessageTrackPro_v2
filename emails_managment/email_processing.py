@@ -148,7 +148,6 @@ def store_email(data, filepath, with_attachments):
             msg = BytesParser(policy=default).parse(f)
     else:
         msg = data
-    id = hash_message(msg=msg)
 
     attachments = []
     body = ""
@@ -177,11 +176,11 @@ def store_email(data, filepath, with_attachments):
     bcc_names, bcc_emails = split_names_and_emails(bcc_addresses)
 
     date_obj = convert_date_to_datetime(msg['date'])
-
+    date_iso8601 = date_obj.isoformat() if date_obj else None
     data = {
+        'id': hash_message(msg=msg),
         'filepath': filepath,
         'filename': os.path.basename(filepath),
-        'from': msg['from'],
         'from_name': from_name,
         'from_email': from_email,
         'to_names': to_names,
@@ -192,29 +191,28 @@ def store_email(data, filepath, with_attachments):
         'bcc_emails': bcc_emails,
         'subject': msg['subject'],
         'date_obj': date_obj,
+        'date_iso8601': date_iso8601,
         'body': body,
         'attachments': attachments
     }
-    return id, data
+    return data
 
 def process_file(file_type, filepath, with_attachments):
-    email_dict = {}
+    email_list = []
     if file_type == ".eml" or file_type == ".OUTLOOK.COM":
-        id, data = store_email(None, filepath=filepath, with_attachments=with_attachments)
-        email_dict[id] = [data]
+        data = store_email(None, filepath=filepath, with_attachments=with_attachments)
+        email_list.append(data)
     elif file_type == ".mbox":
         try:
             mbox = mailbox.mbox(path=filepath)
             for msg in mbox:
-                id, data = store_email(data=msg, filepath=filepath, with_attachments=with_attachments)
-                if id not in email_dict:
-                    email_dict[id] = []
-                email_dict[id].append(data)
+                data = store_email(data=msg, filepath=filepath, with_attachments=with_attachments)
+                email_list.append(data)
         except Exception as e:
             print(f"Error reading mbox file {filepath}: {e}")
     else:
         raise NotImplementedError
-    return email_dict
+    return email_list
 
 class EmailProcessing:
     def __init__(self, path, with_attachments=False):
@@ -260,7 +258,6 @@ class EmailProcessing:
             file_path = os.path.join(root, file)
 
         if file.endswith(tuple(self.__supported_extensions)):
-            #print(f"Adding file: {file_path}")
             if file.endswith('.OUTLOOK.COM'):
                 self.__filepath_dict.setdefault('.OUTLOOK.COM', []).append(file_path)
             elif file.endswith('.eml'):
@@ -281,32 +278,23 @@ class EmailProcessing:
 
                 for future in as_completed(futures):
                     result = future.result()
-                    for id, data in result.items():
-                        if id not in self.__email_dict:
-                            self.__email_dict[id] = []
-                        self.__email_dict[id].extend(data)
+                    for data in result:
+                        if data['id'] not in self.__email_dict:
+                            self.__email_dict[data['id']] = data
+                        else:
+                            raise NotImplementedError("Duplicate ID found in __file_processing.")
+
                     pbar.update(1)
                     pbar.refresh()
                     sys.stdout.flush()
-
+        self.__email_list = list(self.__email_dict.values())
         end_time = time.time()
         self.__time_dict['Time for file processing'] = end_time - start_time
         sys.stdout.flush()
 
     def __build_email_df(self):
         start_time = time.time()
-        columns = set()
-        for infos in self.__email_dict.values():
-            for info in infos:
-                columns.update(info.keys())
-        data = []
-        for file_id, infos in self.__email_dict.items():
-            for info in infos:
-                row = {'ID': file_id}
-                row.update(info)
-                data.append(row)
-        df = pl.DataFrame(data)
-
+        df = pl.DataFrame(self.__email_list)
         end_time = time.time()
         self.__time_dict['Time for building email dataframe'] = end_time - start_time
         return df
@@ -325,6 +313,10 @@ class EmailProcessing:
 
     def get_emails(self, limit=10):
         return self.__email_dataframe.head(n=limit)
+
+    @property
+    def get_emails_list(self):
+        return self.__email_list
 
     @property
     def get_duplicates(self):
