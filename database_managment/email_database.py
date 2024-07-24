@@ -2,11 +2,17 @@ import sqlite3
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import time
+from datetime import timedelta
 
 class EmailDatabase:
     def __init__(self, db_name='database.db'):
         self._db_name = db_name
         self._create_tables()
+        self.unique_values = {
+            'aliases': set(),
+            'email_addresses': set(),
+            'attachments_id': set()
+        }
 
     def _create_tables(self):
         conn = sqlite3.connect(self._db_name)
@@ -87,12 +93,13 @@ class EmailDatabase:
 
         c.execute(
             '''CREATE TABLE IF NOT EXISTS Attachments(
-            id INTEGER PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             email_id INTEGER,
             filename TEXT,
             content BLOB,
             FOREIGN KEY(email_id) REFERENCES Emails(id))'''
         )
+
         conn.commit()
         conn.close()
 
@@ -118,6 +125,15 @@ class EmailDatabase:
         conn.close()
         return last_ids
 
+    def _value_exists(self, table, column, value):
+        conn = sqlite3.connect(self._db_name)
+        c = conn.cursor()
+        query = f'''SELECT id FROM {table} WHERE {column} = ?'''
+        c.execute(query, (value,))
+        result = c.fetchone()
+        conn.close()
+        return result[0] if result else None
+
     def insert_contact(self, first_name, last_name):
         query = '''INSERT OR IGNORE INTO Contacts(first_name, last_name) VALUES (?,?)'''
         return self._execute_query(query, (first_name, last_name))
@@ -132,8 +148,16 @@ class EmailDatabase:
         return self._execute_many(query, contacts)
 
     def insert_contact_alias(self, alias):
-        query = '''INSERT OR IGNORE INTO Alias(alias) VALUES (?)'''
-        return self._execute_query(query, (alias,))
+        if alias not in self.unique_values['aliases']:
+            id = self._value_exists(table='Alias', column='alias', value=alias)
+            if id is not None:
+                self.unique_values['aliases'].add(alias)
+                return id
+            else:
+                query = '''INSERT OR IGNORE INTO Alias(alias) VALUES (?)'''
+                alias_id = self._execute_query(query, (alias,))
+                self.unique_values['aliases'].add(alias_id)
+                return alias_id
 
     def insert_contact_aliases(self, aliases):
         query = '''INSERT OR IGNORE INTO Alias(alias) VALUES (?)'''
@@ -172,38 +196,59 @@ class EmailDatabase:
         """
         :param email: tuple(id, filepath, filename, from_id, subject, date, date_iso8601, body)
         """
-        query = '''INSERT INTO Emails (id, filepath, filename, from_id, subject, date, date_iso8601, body)
+        query = '''INSERT OR IGNORE INTO Emails (id, filepath, filename, from_id, subject, date, date_iso8601, body)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
         return self._execute_query(query, email)
 
     def insert_emails(self, emails):
-        query = '''INSERT INTO Emails (id, filepath, filename, from_id, subject, date, date_iso8601, body)
+        query = '''INSERT OR IGNORE INTO Emails (id, filepath, filename, from_id, subject, date, date_iso8601, body)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
         return self._execute_many(query, emails)
 
     def link_recipient(self, email_id, email_address_id):
-        query = '''INSERT INTO Email_To (email_id, email_address_id) VALUES (?, ?)'''
+        query = '''INSERT OR IGNORE INTO Email_To (email_id, email_address_id) VALUES (?, ?)'''
         self._execute_query(query, (email_id, email_address_id))
 
     def link_recipients(self, recipients):
-        query = '''INSERT INTO Email_To (email_id, email_address_id) VALUES (?, ?)'''
+        query = '''INSERT OR IGNORE INTO Email_To (email_id, email_address_id) VALUES (?, ?)'''
         self._execute_many(query, recipients)
 
     def link_cc(self, email_id, email_address_id):
-        query = '''INSERT INTO Email_Cc (email_id, email_address_id) VALUES (?, ?)'''
+        query = '''INSERT OR IGNORE INTO Email_Cc (email_id, email_address_id) VALUES (?, ?)'''
         self._execute_query(query, (email_id, email_address_id))
 
     def link_ccs(self, ccs):
-        query = '''INSERT INTO Email_Cc (email_id, email_address_id) VALUES (?, ?)'''
+        query = '''INSERT OR IGNORE INTO Email_Cc (email_id, email_address_id) VALUES (?, ?)'''
         self._execute_many(query, ccs)
 
     def link_bcc(self, email_id, email_address_id):
-        query = '''INSERT INTO Email_Bcc (email_id, email_address_id) VALUES (?, ?)'''
+        query = '''INSERT OR IGNORE INTO Email_Bcc (email_id, email_address_id) VALUES (?, ?)'''
         self._execute_query(query, (email_id, email_address_id))
 
     def link_bccs(self, bccs):
-        query = '''INSERT INTO Email_Bcc (email_id, email_address_id) VALUES (?, ?)'''
+        query = '''INSERT OR IGNORE INTO Email_Bcc (email_id, email_address_id) VALUES (?, ?)'''
         self._execute_many(query, bccs)
+
+    def insert_attachment(self, id, email_id, filename, content):
+        query = '''INSERT INTO Attachments (id, email_id, filename, content) VALUES (?, ?, ?, ?)'''
+        return self._execute_query(query, (email_id, filename, content))
+
+    def insert_attachments(self, attachments):
+        query = '''INSERT INTO Attachments (id, email_id, filename, content) VALUES (?, ?, ?, ?)'''
+        new_attachments = []
+        for attachment in attachments:
+            attachment_id = attachment[0]
+            if attachment_id not in self.unique_values['attachments']:
+                id = self._value_exists(table='Attachments', column='id', value=attachment_id)
+                if id is not None:
+                    self.unique_values['attachments'].add(attachment_id)
+                else:
+                    new_attachments.append(attachment)
+                    self.unique_values['attachments'].add(attachment_id)
+        if new_attachments:
+            return self._execute_many(query, new_attachments)
+        return []
+
 
     def get_email_address_id(self, email):
         conn = sqlite3.connect(self._db_name)
@@ -213,42 +258,67 @@ class EmailDatabase:
         conn.close()
         return email_address_id[0] if email_address_id else None
 
+class EmailLoader:
+    def __init__(self, emails: list, db_name='database.db'):
+        self.db = EmailDatabase(db_name)
+        self._time_dict = {}
+        self._emails = emails
+        self._load_emails_into_db(emails=self._emails)
 
-def process_email(email, db):
-    from_email = email['from_email']
-    from_name = email['from_name']
-    from_email_id = db.insert_email_address(email=from_email)
-    contact_alias_id = db.insert_contact_alias(alias=from_name)
+    def _load_email_into_db(self, email):
+        from_email = email['from_email']
+        from_name = email['from_name']
+        from_email_id = self.db.insert_email_address(email=from_email)
+        contact_alias_id = self.db.insert_contact_alias(alias=from_name)
 
+        email_data = (email['id'], email['filepath'], email['filename'], from_email_id, email['subject'], str(email['date_obj']),
+                      str(email['date_iso8601']), email['body'])
+        email_id = self.db.insert_email(email_data)
 
-    email_data = (email['id'], email['filepath'], email['filename'], from_email_id, email['subject'], str(email['date_obj']),
-                  str(email['date_iso8601']), email['body'])
-    email_id = db.insert_email(email_data)
+        if email['to_emails']:
+            recipients = [(email_id, self.db.get_email_address_id(recipient)) for recipient in email['to_emails']]
+            self.db.link_recipients(recipients)
 
-    if email['to_emails']:
-        recipients = [(email_id, db.get_email_address_id(recipient)) for recipient in email['to_emails']]
-        db.link_recipients(recipients)
+        if email['cc_emails']:
+            ccs = [(email_id, self.db.get_email_address_id(cc)) for cc in email['cc_emails']]
+            self.db.link_ccs(ccs)
 
-    if email['cc_emails']:
-        ccs = [(email_id, db.get_email_address_id(cc)) for cc in email['cc_emails']]
-        db.link_ccs(ccs)
+        if email['bcc_emails']:
+            bccs = [(email_id, self.db.get_email_address_id(bcc)) for bcc in email['bcc_emails']]
+            self.db.link_bccs(bccs)
 
-    if email['bcc_emails']:
-        bccs = [(email_id, db.get_email_address_id(bcc)) for bcc in email['bcc_emails']]
-        db.link_bccs(bccs)
+        if email['attachments']:
+            attachments = [(attachment['id'], email_id, attachment['filename'], attachment['content']) for attachment in email['attachments']]
+            self.db.insert_attachments(attachments)
 
-    # ToDo: insertion of attachments below
+    def _load_emails_into_db(self, emails, multi_processing=False):
+        start_time = time.time()
+        # ToDo: Multiprocessing does not save db insertion time!
+        if multi_processing:
+            with ProcessPoolExecutor() as executor:
+                futures = [executor.submit(self._load_email_into_db, email) for email in emails]
+                for future in tqdm(as_completed(futures), total=len(futures), desc="Load emails into db"):
+                    future.result()
+        else:
+            for email in tqdm(emails, desc="Load emails into db"):
+                self._load_email_into_db(email)
+        end_time = time.time()
+        self._time_dict['Load emails into db'] = end_time - start_time
 
+    @property
+    def log_execution_time(self):
+        if self._time_dict:
+            for text, seconds in self._time_dict.items():
+                elapsed_time = timedelta(seconds=seconds)
+                hours, remainder = divmod(elapsed_time.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                if elapsed_time.days > 0:
+                    print(
+                        f"{text}: {elapsed_time.days} days, {hours} hours, {minutes} minutes, {seconds} seconds")
+                elif hours > 0:
+                    print(f"{text}: {hours} hours, {minutes} minutes, {seconds} seconds")
+                elif minutes > 0:
+                    print(f"{text}: {minutes} minutes, {seconds} seconds")
+                else:
+                    print(f"{text}: {seconds} seconds")
 
-def process_emails(emails):
-    start_time = time.time()
-    db = EmailDatabase()
-    # ToDo: Multiprocessing does not save db insertion time!
-    #with ProcessPoolExecutor() as executor:
-    #    futures = [executor.submit(process_email, email, db) for email in emails]
-    #    for future in tqdm(as_completed(futures), total=len(futures), desc="Processing emails"):
-    #        future.result()
-    for email in tqdm(emails, desc="Processing emails"):
-        process_email(email, db)
-    end_time = time.time()
-    print(f"Processed {len(emails)} emails in {end_time - start_time} seconds")

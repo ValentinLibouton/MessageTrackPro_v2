@@ -119,13 +119,20 @@ def clean_string(s):
 def hash_file(filepath):
     sha256 = hashlib.sha256()
     with open(filepath, 'rb') as f:
-        for block in iter(lambda: f.read(4096), b''):
+        for block in iter(lambda: f.read(4096), b''):  # 4 KB chunks
             sha256.update(block)
     return sha256.hexdigest()
 
-def hash_message(msg):
-    msg_bytes = msg.as_bytes()
-    return hashlib.sha256(msg_bytes).hexdigest()
+def hash_message(data):
+    if isinstance(data, bytes):
+        msg_bytes = data
+    else:
+        msg_bytes = data.as_bytes()
+    sha256 = hashlib.sha256()
+    chunk_size = 8192  # 8 KB chunks
+    for i in range(0, len(msg_bytes), chunk_size):
+        sha256.update(msg_bytes[i:i + chunk_size])
+    return sha256.hexdigest()
 
 def decode_content(part):
     content_type = part.get_content_type()
@@ -161,10 +168,13 @@ def store_email(data, filepath, with_attachments):
             if with_attachments and part.get_content_disposition() == 'attachment':
                 filename = part.get_filename()
                 content = part.get_payload(decode=True)
-                attachments.append({
-                    'filename': filename,
-                    'content': content
-                })
+                if content is not None:
+                    id_attachment = hash_message(data=content)
+                    attachments.append({
+                        'id': id_attachment,
+                        'filename': filename,
+                        'content': content
+                    })
     else:
         body = decode_content(msg)
     from_name, from_email = extract_name_and_email(msg['from'])
@@ -178,7 +188,7 @@ def store_email(data, filepath, with_attachments):
     date_obj = convert_date_to_datetime(msg['date'])
     date_iso8601 = date_obj.isoformat() if date_obj else None
     data = {
-        'id': hash_message(msg=msg),
+        'id': hash_message(data=msg),
         'filepath': filepath,
         'filename': os.path.basename(filepath),
         'from_name': from_name,

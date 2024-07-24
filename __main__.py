@@ -18,5 +18,6 @@ if __name__ == "__main__":
     path = paths_to_dict()['emails_eml']
     ep = EmailProcessing(path=path, with_attachments=True)
     emails = ep.get_emails_list
-    process_emails(emails=emails)
     print(ep.log_execution_time)
+    el = EmailLoader(emails=emails)
+    print(el.log_execution_time)
