@@ -69,7 +69,7 @@ class EmailDatabase:
 
         c.execute(
             '''CREATE TABLE IF NOT EXISTS Email_To(
-            email_id INTEGER,
+            email_id TEXT,
             email_address_id INTEGER,
             FOREIGN KEY(email_id) REFERENCES Emails(id),
             FOREIGN KEY(email_address_id) REFERENCES EmailAddresses(id))'''
@@ -77,7 +77,7 @@ class EmailDatabase:
 
         c.execute(
             '''CREATE TABLE IF NOT EXISTS Email_Cc(
-            email_id INTEGER,
+            email_id TEXT,
             email_address_id INTEGER,
             FOREIGN KEY(email_id) REFERENCES Emails(id),
             FOREIGN KEY(email_address_id) REFERENCES EmailAddresses(id))'''
@@ -85,7 +85,7 @@ class EmailDatabase:
 
         c.execute(
             '''CREATE TABLE IF NOT EXISTS Email_Bcc(
-            email_id INTEGER,
+            email_id TEXT,
             email_address_id INTEGER,
             FOREIGN KEY(email_id) REFERENCES Emails(id),
             FOREIGN KEY(email_address_id) REFERENCES EmailAddresses(id))'''
@@ -94,10 +94,16 @@ class EmailDatabase:
         c.execute(
             '''CREATE TABLE IF NOT EXISTS Attachments(
             id TEXT PRIMARY KEY,
-            email_id INTEGER,
             filename TEXT,
-            content BLOB,
-            FOREIGN KEY(email_id) REFERENCES Emails(id))'''
+            content BLOB)'''
+        )
+
+        c.execute(
+            '''CREATE TABLE IF NOT EXISTS EmailAttachments(
+            email_id TEXT,
+            attachment_id TEXT,
+            FOREIGN KEY(email_id) REFERENCES Emails(id),
+            FOREIGN KEY(attachment_id) REFERENCES Attachments(id))'''
         )
 
         conn.commit()
@@ -230,24 +236,29 @@ class EmailDatabase:
         self._execute_many(query, bccs)
 
     def insert_attachment(self, id, email_id, filename, content):
-        query = '''INSERT INTO Attachments (id, email_id, filename, content) VALUES (?, ?, ?, ?)'''
+        query = '''INSERT INTO Attachments (id, filename, content) VALUES (?, ?, ?)'''
         return self._execute_query(query, (email_id, filename, content))
 
     def insert_attachments(self, attachments):
-        query = '''INSERT INTO Attachments (id, email_id, filename, content) VALUES (?, ?, ?, ?)'''
+        query = '''INSERT INTO Attachments (id, filename, content) VALUES (?, ?, ?)'''
         new_attachments = []
         for attachment in attachments:
             attachment_id = attachment[0]
-            if attachment_id not in self.unique_values['attachments']:
+            if attachment_id not in self.unique_values['attachments_id']:
                 id = self._value_exists(table='Attachments', column='id', value=attachment_id)
                 if id is not None:
-                    self.unique_values['attachments'].add(attachment_id)
+                    self.unique_values['attachments_id'].add(attachment_id)
                 else:
                     new_attachments.append(attachment)
-                    self.unique_values['attachments'].add(attachment_id)
+                    self.unique_values['attachments_id'].add(attachment_id)
         if new_attachments:
             return self._execute_many(query, new_attachments)
-        return []
+        return [attachment[0] for attachment in attachments]
+
+    def link_attachments_to_email(self, email_id, attachment_ids):
+        query = '''INSERT INTO EmailAttachments (email_id, attachment_id) VALUES (?, ?)'''
+        params = [(email_id, attachment_id) for attachment_id in attachment_ids]
+        self._execute_many(query, params)
 
 
     def get_email_address_id(self, email):
@@ -288,8 +299,9 @@ class EmailLoader:
             self.db.link_bccs(bccs)
 
         if email['attachments']:
-            attachments = [(attachment['id'], email_id, attachment['filename'], attachment['content']) for attachment in email['attachments']]
-            self.db.insert_attachments(attachments)
+            attachments = [(att['id'], att['filename'], att['content']) for att in email['attachments']]
+            attachment_ids = self.db.insert_attachments(attachments)
+            self.db.link_attachments_to_email(email_id, attachment_ids)
 
     def _load_emails_into_db(self, emails, multi_processing=False):
         start_time = time.time()
