@@ -349,21 +349,17 @@ class EmailDatabase:
         return self._execute_query(query, (email_id, filename, content))
 
     def insert_attachments(self, attachments):
-        # ToDo faire différemment ici pour tester uniquement la présence de l'id
-        query = '''INSERT INTO Attachments (id, filename, content) VALUES (?, ?, ?)'''
-        new_attachments = []
-        for attachment in attachments:
-            attachment_id = attachment[0]
-            if attachment_id not in self.unique_values['attachments_id']:
-                id = self._value_exist_in_db(table='Attachments', column='id', value=attachment_id)
-                if id is not None:
-                    self.unique_values['attachments_id'].add(attachment_id)
-                else:
-                    new_attachments.append(attachment)
-                    self.unique_values['attachments_id'].add(attachment_id)
+        attachment_ids = [attachment[0] for attachment in attachments]
+        existing_ids = self.unique_values['attachments_ids'] | self._ids_exist_in_db('Attachments', attachment_ids)
+
+        new_attachments = [attachment for attachment in attachments if attachment[0] not in existing_ids]
         if new_attachments:
-            return self._execute_many(query, new_attachments)
+            query = '''INSERT INTO Attachments (id, filename, content) VALUES (?, ?, ?)'''
+            self._execute_many(query, new_attachments)
+            self.unique_values['attachments_ids'].update(attachment[0] for attachment in attachments)
         return [attachment[0] for attachment in attachments]
+
+
 
     def link_attachments_to_email(self, email_id, attachment_ids):
         query = '''INSERT INTO EmailAttachments (email_id, attachment_id) VALUES (?, ?)'''
