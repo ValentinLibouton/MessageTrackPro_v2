@@ -13,7 +13,7 @@ class EmailDatabase:
             'aliases': set(),
             'email_addresses': set(),
             'email_ids': set(),
-            'attachments_id': set()
+            'attachments_ids': set()
         }
 
     def _create_tables(self):
@@ -144,10 +144,13 @@ class EmailDatabase:
         return result[0] if result else None
 
     def _values_exist_in_db(self, table, columns, values_list):
+        if not values_list:
+            return {}
         conn = sqlite3.connect(self._db_name)
         c = conn.cursor()
-        placeholders = ', '.join('?' for _ in values_list[0])
-        query = f"SELECT id, {', '.join(columns)} FROM {table} WHERE ({', '.join(columns)}) IN ({placeholders})"
+        placeholders = ', '.join('?' for _ in columns)
+        #query = f"SELECT id, {', '.join(columns)} FROM {table} WHERE ({', '.join(columns)}) IN ({placeholders})"
+        query = f"SELECT id, {', '.join(columns)} FROM {table} WHERE ({', '.join(columns)}) IN ({', '.join(['(' + placeholders + ')' for _ in values_list])})"
         c.execute(query, [item for sublist in values_list for item in sublist])
         rows = c.fetchall()
         conn.close()
@@ -170,23 +173,21 @@ class EmailDatabase:
         value_set = set(values_list)
         unique_values_set = self.unique_values[data_name]
         values_not_in_unique = value_set - unique_values_set
-
-        existing_values = self._values_exist_in_db(table=table, columns=columns, values_list=list(values_not_in_unique))
-        existing_values_set = set(existing_values.keys())
-        new_values = values_not_in_unique - existing_values_set
-
-        if new_values:
-            columns_str = ', '.join(columns)
-            placeholders = ', '.join('?' for _ in columns)
-            query = f'''INSERT OR IGNORE INTO {table} ({columns_str}) VALUES ({placeholders})'''
-            self._execute_many(query, list(new_values))
-
-            new_existing_values = self._values_exist_in_db(table=table, columns=columns, values_list=list(new_values))
-            existing_values.update(new_existing_values)
-
-            unique_values_set.update(new_existing_values.keys())
-
-        return existing_values
+        if values_not_in_unique:
+            existing_values = self._values_exist_in_db(table=table, columns=columns, values_list=list(values_not_in_unique))
+            existing_values_set = set(existing_values.keys())
+            new_values = values_not_in_unique - existing_values_set
+            if new_values:
+                columns_str = ', '.join(columns)
+                placeholders = ', '.join('?' for _ in columns)
+                query = f'''INSERT OR IGNORE INTO {table} ({columns_str}) VALUES ({placeholders})'''
+                self._execute_many(query, list(new_values))
+                new_existing_values = self._values_exist_in_db(table=table, columns=columns, values_list=list(new_values))
+                existing_values.update(new_existing_values)
+                unique_values_set.update(new_existing_values.keys())
+            return existing_values
+        else:
+            return {}
 
     def _id_exist_in_db(self, table, id):
         conn = sqlite3.connect(self._db_name)
@@ -206,6 +207,16 @@ class EmailDatabase:
         result = c.fetchall()
         conn.close()
         return {row[0] for row in result}
+
+    def _remove_duplicates(self, dict_list):
+        """Remove dictionaries with duplicate 'id' keys from a list of dictionaries."""
+        seen_ids = set()
+        unique_dicts = []
+        for d in dict_list:
+            if d['id'] not in seen_ids:
+                unique_dicts.append(d)
+                seen_ids.add(d['id'])
+        return unique_dicts
 
     def insert_contact(self, first_name, last_name):
         args = {
@@ -295,7 +306,7 @@ class EmailDatabase:
         """
         id = email[0]
         if id not in self.unique_values['email_ids']:
-            if self._id_exist_in_db('Email', id):
+            if self._id_exist_in_db('Emails', id):
                 self.unique_values['email_ids']
             else:
                 query = '''INSERT INTO Emails (id, filepath, filename, from_id, subject, date, date_iso8601, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
@@ -349,20 +360,20 @@ class EmailDatabase:
         return self._execute_query(query, (email_id, filename, content))
 
     def insert_attachments(self, attachments):
-        attachment_ids = [attachment[0] for attachment in attachments]
-        existing_ids = self.unique_values['attachments_ids'] | self._ids_exist_in_db('Attachments', attachment_ids)
+        unique_attachments = self._remove_duplicates(attachments)
+        attachment_ids = [att['id'] for att in unique_attachments]
+        existing_ids = self.unique_values['attachments_ids'] | set(self._ids_exist_in_db('Attachments', attachment_ids))
 
-        new_attachments = [attachment for attachment in attachments if attachment[0] not in existing_ids]
+        new_attachments = [attachment for attachment in unique_attachments if attachment['id'] not in existing_ids]
         if new_attachments:
             query = '''INSERT INTO Attachments (id, filename, content) VALUES (?, ?, ?)'''
-            self._execute_many(query, new_attachments)
-            self.unique_values['attachments_ids'].update(attachment[0] for attachment in attachments)
-        return [attachment[0] for attachment in attachments]
+            self._execute_many(query, [(att['id'], att['filename'], att['content']) for att in new_attachments])
+            self.unique_values['attachments_ids'].update(att['id'] for att in new_attachments)
 
-
+        return attachment_ids
 
     def link_attachments_to_email(self, email_id, attachment_ids):
-        query = '''INSERT INTO EmailAttachments (email_id, attachment_id) VALUES (?, ?)'''
+        query = '''INSERT INTO Email_Attachments (email_id, attachment_id) VALUES (?, ?)'''
         params = [(email_id, attachment_id) for attachment_id in attachment_ids]
         self._execute_many(query, params)
 
@@ -385,7 +396,7 @@ class EmailLoader:
     def _load_email_into_db(self, email):
         from_email = email['from_email']
         from_name = email['from_name']
-        from_email_id = self.db.insert_email_address(email=from_email)
+        from_email_id = self.db.insert_email_address(email_addr=from_email)
         contact_alias_id = self.db.insert_alias(alias=from_name)
 
         email_data = (email['id'], email['filepath'], email['filename'], from_email_id, email['subject'], str(email['date_obj']),
@@ -405,8 +416,8 @@ class EmailLoader:
             self.db.link_bccs([(email_id, email_address_id) for email_address_id in email_address_ids])
 
         if email['attachments']:
-            attachments = [(att['id'], att['filename'], att['content']) for att in email['attachments']]
-            attachment_ids = list(self.db.insert_attachments(attachments).values())
+            #attachments = [(att['id'], att['filename'], att['content']) for att in email['attachments']]
+            attachment_ids = self.db.insert_attachments(email['attachments'])
             self.db.link_attachments_to_email(email_id, attachment_ids)
 
     def _load_emails_into_db(self, emails, multi_processing=False):
