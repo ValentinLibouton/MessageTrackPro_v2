@@ -145,6 +145,8 @@ class EmailDatabase:
         finally:
             conn.close()
 
+
+
     def _value_exist_in_db(self, table, columns, values):
         conn = sqlite3.connect(self._db_name)
         c = conn.cursor()
@@ -308,7 +310,55 @@ class EmailDatabase:
             'columns': ('email_address',)
         }
         return self._values_exist(**args)
+    # Todo: Je développe une nouvelle méthode ci-dessous pour toutes les autres méthodes ###############################
+    def select(self, table:str, columns:list, where_col:str, values_list:list):
+        query = f"""SELECT {', '.join(columns)} FROM {table} WHERE {where_col} IN {', '.join('?' for _ in values_list)}"""
+        conn = sqlite3.connect(self._db_name)
+        try:
+            c = conn.cursor()
+            c.execute(query, values_list)
+            result = c.fetchall()
+            return result
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
 
+    def select_link(self, table: str, columns: list, where_cols: list, values_list: list):
+        results = []
+        conn = sqlite3.connect(self._db_name)
+        try:
+            c = conn.cursor()
+            for values in values_list:
+                conditions = ' AND '.join(f"{col} = ?" for col in where_cols)
+                query = f"""SELECT {', '.join(columns)} FROM {table} WHERE {conditions}"""
+                c.execute(query, values)
+                result = c.fetchall()
+                results.extend(result)
+            return results
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    def insert_many(self, table:str, columns:list, values_list:list):
+        query = f"""INSERT OR IGNORE INTO {table} ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})"""
+        conn = sqlite3.connect(self._db_name)
+        try:
+            c = conn.cursor()
+            c.executemany(query, values_list)
+            last_ids = [c.lastrowid for _ in values_list]
+            conn.commit()
+            inserted_rows = self.select_link(table=table, columns=columns, where_cols=columns, values_list=values_list)
+            return inserted_rows
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    # Todo ############################################################################################################
     def insert_email_addresses(self, emails_addr):
         """
         Args:
@@ -320,22 +370,7 @@ class EmailDatabase:
         addr_not_in_unique_values = email_addr_set - email_in_unique_values
         if addr_not_in_unique_values:
             # Step 2: Retrieve IDs and email addresses from the database
-            table = 'EmailAddresses'
-            sel_columns = ['id', 'email_address']
-            sel_columns_str = ', '.join(sel_columns)
-            column_where = 'email_address'
-            placeholders = ', '.join('?' for _ in addr_not_in_unique_values)
-
-            ins_columns = ['email_address']
-            ins_columns_str = ', '.join(ins_columns)
-
-            query = f'''SELECT {sel_columns_str} FROM {table} WHERE {column_where} IN ({placeholders})'''
-            conn = sqlite3.connect(self._db_name)
-            c = conn.cursor()
-            c.execute(query, list(addr_not_in_unique_values))
-            result = c.fetchall()
-            conn.close()
-
+            result = self.select(table='EmailAddresses', columns=['id', 'email_address'], where_col='email_address', values_list=list(addr_not_in_unique_values))
             # Update unique values with the results from the database
             existing_emails = {email: id for id, email in result}
             self.unique_values['email_addresses'].update(existing_emails.keys())
@@ -343,9 +378,7 @@ class EmailDatabase:
             # Step 3: Insert new email addresses if necessary
             new_emails = addr_not_in_unique_values - existing_emails.keys()
             if new_emails:
-                insert_query = f'''INSERT OR IGNORE INTO {table} ({ins_columns_str}) VALUES (?)'''
-                new_email_tuples = [(email,) for email in new_emails]
-                new_ids = self._execute_many(insert_query, new_email_tuples)
+                new_ids = self.insert_many(table='EmailAddresses', columns=['email_address'], values_list=list(new_emails))
                 new_entries = {email: new_id for email, new_id in zip(new_emails, new_ids)}
                 existing_emails.update(new_entries)
                 self.unique_values['email_addresses'].update(new_emails)
@@ -498,6 +531,7 @@ class EmailLoader:
         if email['attachments']:
             #attachments = [(att['id'], att['filename'], att['content']) for att in email['attachments']]
             attachment_ids = self.db.insert_attachments(email['attachments'])
+
             self.db.link_attachments_to_email(email_id, attachment_ids)
 
     def _load_emails_into_db(self, emails, multi_processing=False):
