@@ -13,6 +13,7 @@ class EmailDatabase:
             'aliases': set(),
             'email_addresses': set(),
             'email_ids': set(),
+            'link_recipients':set(),
             'attachments_ids': set()
         }
 
@@ -113,25 +114,36 @@ class EmailDatabase:
 
     def _execute_query(self, query, params):
         conn = sqlite3.connect(self._db_name)
-        c = conn.cursor()
-        c.execute(query, params)
-        last_id = c.lastrowid
-        conn.commit()
-        conn.close()
-        return last_id
+        try:
+            c = conn.cursor()
+            c.execute(query, params)
+            last_id = c.lastrowid
+            conn.commit()
+            return last_id
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
 
     def _execute_many(self, query, params, ids=None):
         conn = sqlite3.connect(self._db_name)
-        c = conn.cursor()
-        if ids is not None:
-            params_with_ids = [(ids[i],) + param for i, param in enumerate(params)]
-            c.executemany(query, params_with_ids)
-        else:
-            c.executemany(query, params)
-        last_ids = [c.lastrowid for _ in params]
-        conn.commit()
-        conn.close()
-        return last_ids
+        try:
+            c = conn.cursor()
+            if ids is not None:
+                params_with_ids = [(ids[i],) + param for i, param in enumerate(params)]
+                c.executemany(query, params_with_ids)
+            else:
+                c.executemany(query, params)
+            last_ids = [c.lastrowid for _ in params]
+            conn.commit()
+            return last_ids
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
 
     def _value_exist_in_db(self, table, columns, values):
         conn = sqlite3.connect(self._db_name)
@@ -143,18 +155,23 @@ class EmailDatabase:
         conn.close()
         return result[0] if result else None
 
-    def _values_exist_in_db(self, table, columns, values_list):
+    def _values_exist_in_db(self, table, columns, values_list, is_link_table=False):
         if not values_list:
             return {}
         conn = sqlite3.connect(self._db_name)
         c = conn.cursor()
         placeholders = ', '.join('?' for _ in columns)
-        #query = f"SELECT id, {', '.join(columns)} FROM {table} WHERE ({', '.join(columns)}) IN ({placeholders})"
-        query = f"SELECT id, {', '.join(columns)} FROM {table} WHERE ({', '.join(columns)}) IN ({', '.join(['(' + placeholders + ')' for _ in values_list])})"
+        if is_link_table:
+            query = f"SELECT {', '.join(columns)} FROM {table} WHERE ({', '.join(columns)}) IN ({', '.join(['(' + placeholders + ')' for _ in values_list])})"
+        else:
+            query = f"SELECT id, {', '.join(columns)} FROM {table} WHERE ({', '.join(columns)}) IN ({', '.join(['(' + placeholders + ')' for _ in values_list])})"
         c.execute(query, [item for sublist in values_list for item in sublist])
         rows = c.fetchall()
         conn.close()
+        if is_link_table:
+            return {tuple(row): None for row in rows}
         return {tuple(row[1:]): row[0] for row in rows}
+
 
     def _value_exist(self, data_name: str, values: tuple, table: str, columns: tuple):
         if values not in self.unique_values[data_name]:
@@ -169,12 +186,12 @@ class EmailDatabase:
         else:
             return self._value_exist_in_db(table=table, columns=columns, values=values)
 
-    def _values_exist(self, data_name: str, values_list: list, table: str, columns: tuple):
+    def _values_exist(self, data_name: str, values_list: list, table: str, columns: tuple, is_link_table=False):
         value_set = set(values_list)
         unique_values_set = self.unique_values[data_name]
         values_not_in_unique = value_set - unique_values_set
         if values_not_in_unique:
-            existing_values = self._values_exist_in_db(table=table, columns=columns, values_list=list(values_not_in_unique))
+            existing_values = self._values_exist_in_db(table=table, columns=columns, values_list=list(values_not_in_unique), is_link_table=is_link_table)
             existing_values_set = set(existing_values.keys())
             new_values = values_not_in_unique - existing_values_set
             if new_values:
@@ -182,7 +199,7 @@ class EmailDatabase:
                 placeholders = ', '.join('?' for _ in columns)
                 query = f'''INSERT OR IGNORE INTO {table} ({columns_str}) VALUES ({placeholders})'''
                 self._execute_many(query, list(new_values))
-                new_existing_values = self._values_exist_in_db(table=table, columns=columns, values_list=list(new_values))
+                new_existing_values = self._values_exist_in_db(table=table, columns=columns, values_list=list(new_values), is_link_table=is_link_table)
                 existing_values.update(new_existing_values)
                 unique_values_set.update(new_existing_values.keys())
             return existing_values
@@ -282,7 +299,7 @@ class EmailDatabase:
         }
         return self._value_exist(**args)
 
-    def insert_email_addresses(self, emails_addr):
+    def insert_email_addresses_old(self, emails_addr):
         list_of_tuples = [(email_addr,) for email_addr in emails_addr]
         args = {
             'data_name': 'email_addresses',
@@ -291,6 +308,59 @@ class EmailDatabase:
             'columns': ('email_address',)
         }
         return self._values_exist(**args)
+
+    def insert_email_addresses(self, emails_addr):
+        """
+        Args:
+            email_addr: list(email)
+        Returns:
+        """
+        email_addr_set = set(emails_addr)
+        email_in_unique_values = self.unique_values['email_addresses']
+        addr_not_in_unique_values = email_addr_set - email_in_unique_values
+        if addr_not_in_unique_values:
+            # Step 2: Retrieve IDs and email addresses from the database
+            table = 'EmailAddresses'
+            sel_columns = ['id', 'email_address']
+            sel_columns_str = ', '.join(sel_columns)
+            column_where = 'email_address'
+            placeholders = ', '.join('?' for _ in addr_not_in_unique_values)
+
+            ins_columns = ['email_address']
+            ins_columns_str = ', '.join(ins_columns)
+
+            query = f'''SELECT {sel_columns_str} FROM {table} WHERE {column_where} IN ({placeholders})'''
+            conn = sqlite3.connect(self._db_name)
+            c = conn.cursor()
+            c.execute(query, list(addr_not_in_unique_values))
+            result = c.fetchall()
+            conn.close()
+
+            # Update unique values with the results from the database
+            existing_emails = {email: id for id, email in result}
+            self.unique_values['email_addresses'].update(existing_emails.keys())
+
+            # Step 3: Insert new email addresses if necessary
+            new_emails = addr_not_in_unique_values - existing_emails.keys()
+            if new_emails:
+                insert_query = f'''INSERT OR IGNORE INTO {table} ({ins_columns_str}) VALUES (?)'''
+                new_email_tuples = [(email,) for email in new_emails]
+                new_ids = self._execute_many(insert_query, new_email_tuples)
+                new_entries = {email: new_id for email, new_id in zip(new_emails, new_ids)}
+                existing_emails.update(new_entries)
+                self.unique_values['email_addresses'].update(new_emails)
+
+        else:
+            existing_emails = {}
+
+        # Step 4: Return the IDs for all email addresses provided
+        all_ids = [existing_emails[email] if email in existing_emails else self.get_email_address_id(email) for email in
+                   emails_addr]
+
+        if len(all_ids) != len(emails_addr):
+            raise ValueError("Mismatch between the number of email addresses provided and the IDs returned")
+
+        return all_ids
 
     def link_email_address_to_contact(self, contact_id, email_address_id):
         query = '''INSERT OR IGNORE INTO Contact_EmailAddresses(contact_id, email_address_id) VALUES (?, ?)'''
@@ -335,8 +405,18 @@ class EmailDatabase:
         self._execute_query(query, (email_id, email_address_id))
 
     def link_recipients(self, recipients):
-        query = '''INSERT OR IGNORE INTO Email_To (email_id, email_address_id) VALUES (?, ?)'''
-        self._execute_many(query, recipients)
+        args = {
+            'data_name': 'link_recipients',
+            'values_list': recipients,
+            'table': 'Email_To',
+            'columns': ("email_id", "email_address_id"),
+            'is_link_table': True
+        }
+        existing_links = self._values_exist(**args)
+        new_links = [link for link in recipients if link not in existing_links]
+        if new_links:
+            query = '''INSERT OR IGNORE INTO Email_To (email_id, email_address_id) VALUES (?, ?)'''
+            self._execute_many(query, new_links)
 
     def link_cc(self, email_id, email_address_id):
         query = '''INSERT OR IGNORE INTO Email_Cc (email_id, email_address_id) VALUES (?, ?)'''
@@ -404,16 +484,16 @@ class EmailLoader:
         email_id = self.db.insert_email(email_data)
 
         if email['to_emails']:
-            email_address_ids = list(self.db.insert_email_addresses(email['to_emails']).values())
-            self.db.link_recipients([(email_id, email_address_id) for email_address_id in email_address_ids])
+            email_address_to_ids = list(self.db.insert_email_addresses(email['to_emails']))
+            self.db.link_recipients([(email_id, email_address_id) for email_address_id in email_address_to_ids if email_address_id])
 
         if email['cc_emails']:
-            email_address_ids = list(self.db.insert_email_addresses(email['cc_emails']).values())
-            self.db.link_ccs([(email_id, email_address_id) for email_address_id in email_address_ids])
+            email_address_cc_ids = list(self.db.insert_email_addresses(email['cc_emails']))
+            self.db.link_ccs([(email_id, email_address_id) for email_address_id in email_address_cc_ids if email_address_id])
 
         if email['bcc_emails']:
-            email_address_ids = list(self.db.insert_email_addresses(email['bcc_emails']).values())
-            self.db.link_bccs([(email_id, email_address_id) for email_address_id in email_address_ids])
+            email_address_bcc_ids = list(self.db.insert_email_addresses(email['bcc_emails']))
+            self.db.link_bccs([(email_id, email_address_id) for email_address_id in email_address_bcc_ids if email_address_id])
 
         if email['attachments']:
             #attachments = [(att['id'], att['filename'], att['content']) for att in email['attachments']]

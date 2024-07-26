@@ -18,13 +18,38 @@ import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tabulate import tabulate
 
-def extract_name_and_email(email_str):
+def extract_name_and_email_old(email_str):
     name, email = parseaddr(email_str)
     return name, email
 
-def extract_multiple_names_and_emails(email_str):
+
+def extract_name_and_email(fieldvalues: str):
+    trimmed_field = fieldvalues.strip()
+    last_space_index = trimmed_field.rfind(' ')
+
+    if last_space_index == -1:
+        address = clean_string(trimmed_field)
+        return '', address
+
+    name = trimmed_field[:last_space_index]
+    address = trimmed_field[last_space_index + 1:]
+    name = clean_string(name)
+    address = clean_string(address)
+    return name, address
+
+def extract_multiple_names_and_emails_old(email_str):
+    # Todo cette fonction ne fonctionne pas toujours correctement, je dois la réimplémenter moi même sans utiliser email.utils
     addresses = getaddresses([email_str])
     return [{'name': name, 'email': email} for name, email in addresses]
+
+def extract_multiple_names_and_emails(fieldvalues):
+    splited_filed = fieldvalues.split(',')
+    extracted_list = []
+    for field in splited_filed:
+        name, email = extract_name_and_email(field)
+        d = {'name': name, 'email': email}
+        extracted_list.append(d)
+    return extracted_list
 
 def is_daylight_saving(date, timezone='Europe/Brussels'):
     tz = pytz.timezone(timezone)
@@ -95,9 +120,11 @@ def split_names_and_emails(addresses, string_cleaning=True):
     for d in addresses:
         name = d.get('name', None)
         email = d.get('email', None)
+        """
         if string_cleaning:
             name = clean_string(s=name)
             email = clean_string(s=email)
+        """
         names.append(name)
         emails.append(email)
     return names, emails
@@ -105,15 +132,8 @@ def split_names_and_emails(addresses, string_cleaning=True):
 def clean_string(s):
     if s is None:
         return None
-    s = s.strip()
-    while ((s.startswith('"') and s.endswith('"')) or
-           (s.startswith("'") and s.endswith("'"))):
-        if s.startswith("'") and s.endswith("'"):
-            s = s[1:-1]
-        elif s.startswith('"') and s.endswith('"'):
-            s = s[1:-1]
-        s = s.strip()
-    return s
+    exclude_char = ['<', '>', '\\', '/', '"', "'"]
+    return ''.join([char for char in s if char not in exclude_char])
 
 
 def hash_file(filepath):
@@ -147,6 +167,25 @@ def decode_content(part):
         except LookupError:
             return payload.decode('utf-8', errors="replace")
     return None
+
+
+def has_multiple_at_signs(input_string):
+    """
+    Check if the input string contains more than one '@' character.
+
+    Parameters:
+    input_string (str): The string to be checked.
+
+    Returns:
+    bool: True if the string contains more than one '@' character, False otherwise.
+
+    Example:
+    >>> has_multiple_at_signs("test@example.com")
+    False
+    >>> has_multiple_at_signs("test@@example.com")
+    True
+    """
+    return input_string.count('@') > 1
 
 
 def store_email(data, filepath, with_attachments):
@@ -185,6 +224,15 @@ def store_email(data, filepath, with_attachments):
     bcc_addresses = extract_multiple_names_and_emails(msg['bcc']) if msg['bcc'] else None
     bcc_names, bcc_emails = split_names_and_emails(bcc_addresses)
 
+    # Todo some tests ...
+    for txt, type in {'to': to_emails, 'cc': cc_emails, 'bcc': bcc_emails}.items():
+        if type:
+            for email in type:
+                if has_multiple_at_signs(email):
+                    print(email)
+                    raise ValueError(f"Trop d'adresses dans le champ {txt}:{email}")
+    # Todo end of tests
+
     date_obj = convert_date_to_datetime(msg['date'])
     date_iso8601 = date_obj.isoformat() if date_obj else None
     data = {
@@ -195,6 +243,7 @@ def store_email(data, filepath, with_attachments):
         'from_email': from_email,
         'to_names': to_names,
         'to_emails': to_emails,
+        # 'cc': msg['cc'],# Todo test en cours
         'cc_name': cc_names,
         'cc_emails': cc_emails,
         'bcc_names': bcc_names,
@@ -227,7 +276,6 @@ def process_file(file_type, filepath, with_attachments):
 class EmailProcessing:
     def __init__(self, path, with_attachments=False):
         """
-
         Args:
             path: directory path or file path
         """
