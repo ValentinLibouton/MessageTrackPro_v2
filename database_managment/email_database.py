@@ -310,6 +310,18 @@ class EmailDatabase:
             'columns': ('email_address',)
         }
         return self._values_exist(**args)
+
+
+
+
+
+
+
+
+
+
+
+
     # Todo: Je développe une nouvelle méthode ci-dessous pour toutes les autres méthodes ###############################
     def select(self, table:str, columns:list, where_col:str, values_list:list):
         query = f"""SELECT {', '.join(columns)} FROM {table} WHERE {where_col} IN {', '.join('?' for _ in values_list)}"""
@@ -325,7 +337,7 @@ class EmailDatabase:
         finally:
             conn.close()
 
-    def select_link(self, table: str, columns: list, where_cols: list, values_list: list):
+    def select_with_conditions(self, table: str, columns: list, where_cols: list, values_list: list):
         results = []
         conn = sqlite3.connect(self._db_name)
         try:
@@ -349,15 +361,20 @@ class EmailDatabase:
         try:
             c = conn.cursor()
             c.executemany(query, values_list)
-            last_ids = [c.lastrowid for _ in values_list]
             conn.commit()
-            inserted_rows = self.select_link(table=table, columns=columns, where_cols=columns, values_list=values_list)
-            return inserted_rows
+
+            inserted_rows = self.select_with_conditions(table=table, columns=['id'],
+                                                        where_cols=columns, values_list=values_list)
+            inserted_ids = [row[0] for row in inserted_rows]
+            if len(inserted_ids) != len(values_list):
+                raise ValueError(f"{len(inserted_ids)} ids ont été récupérés sur {len(values_list)} insertions")
+            return inserted_ids
         except sqlite3.Error as e:
             conn.rollback()
             raise e
         finally:
             conn.close()
+
     # Todo ############################################################################################################
     def insert_email_addresses(self, emails_addr):
         """
@@ -365,35 +382,65 @@ class EmailDatabase:
             email_addr: list(email)
         Returns:
         """
+        print(emails_addr)
         email_addr_set = set(emails_addr)
         email_in_unique_values = self.unique_values['email_addresses']
         addr_not_in_unique_values = email_addr_set - email_in_unique_values
-        if addr_not_in_unique_values:
-            # Step 2: Retrieve IDs and email addresses from the database
-            result = self.select(table='EmailAddresses', columns=['id', 'email_address'], where_col='email_address', values_list=list(addr_not_in_unique_values))
-            # Update unique values with the results from the database
-            existing_emails = {email: id for id, email in result}
-            self.unique_values['email_addresses'].update(existing_emails.keys())
+        # Step 2: Retrieve IDs and email addresses from the database
+        existing_email_addresses = self.select_with_conditions(table='EmailAddresses',
+                                                               columns=['id', 'email_address'],
+                                                               where_cols=['email_address'],
+                                                               values_list=[[addr] for addr
+                                                                            in addr_not_in_unique_values])
 
-            # Step 3: Insert new email addresses if necessary
-            new_emails = addr_not_in_unique_values - existing_emails.keys()
-            if new_emails:
-                new_ids = self.insert_many(table='EmailAddresses', columns=['email_address'], values_list=list(new_emails))
-                new_entries = {email: new_id for email, new_id in zip(new_emails, new_ids)}
-                existing_emails.update(new_entries)
-                self.unique_values['email_addresses'].update(new_emails)
+        # Convert the result to a dictionary for easy lookup
+        existing_emails = {email: id for id, email in existing_email_addresses}
 
-        else:
-            existing_emails = {}
+        # Step 3: Insert new email addresses if necessary
+        new_emails = list(addr_not_in_unique_values - existing_emails.keys())
 
-        # Step 4: Return the IDs for all email addresses provided
-        all_ids = [existing_emails[email] if email in existing_emails else self.get_email_address_id(email) for email in
-                   emails_addr]
+        if new_emails:
+            self.insert_many(table='EmailAddresses',
+                             columns=['email_address'],
+                             values_list=[(email,) for email in new_emails])
 
-        if len(all_ids) != len(emails_addr):
-            raise ValueError("Mismatch between the number of email addresses provided and the IDs returned")
+        all_email_addresses = self.select_with_conditions(
+            table='EmailAddresses',
+            columns=['id', 'email_address'],
+            where_cols=['email_address'],
+            values_list=[(email,) for email in emails_addr])
+        print(all_email_addresses)
+        all_email_dict = {email: id for id, email in all_email_addresses}
+        print(all_email_dict)
+        existing_emails.update(all_email_dict)
 
-        return all_ids
+        self.unique_values['email_addresses'].update(existing_emails.keys())
+
+        if len(emails_addr) != len(all_email_dict):
+            raise ValueError(f"Mismatch between the number of email addresses '{len(emails_addr)}' and the number of ids returned '{len(all_email_dict)}'")
+
+        return all_email_dict
+
+    # Todo ############################################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def link_email_address_to_contact(self, contact_id, email_address_id):
         query = '''INSERT OR IGNORE INTO Contact_EmailAddresses(contact_id, email_address_id) VALUES (?, ?)'''
