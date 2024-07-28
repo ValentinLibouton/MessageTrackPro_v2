@@ -16,6 +16,9 @@ class EmailDatabase:
             'link_recipients':set(),
             'attachments_ids': set()
         }
+        self.buffer = {
+            'email_addresses': {}  # {address: id}
+        }
 
     def _create_tables(self):
         conn = sqlite3.connect(self._db_name)
@@ -355,25 +358,51 @@ class EmailDatabase:
         finally:
             conn.close()
 
-    def insert_many(self, table:str, columns:list, values_list:list):
-        query = f"""INSERT OR IGNORE INTO {table} ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})"""
+    def insert_many(self, table: str, columns: list, values_list: list):
+        placeholders = ', '.join('?' for _ in columns)
+        columns_str = ', '.join(columns)
+        insert_query = f"""INSERT OR IGNORE INTO {table} ({columns_str}) VALUES ({placeholders})"""
+        select_query = f"""SELECT id, {columns_str} FROM {table} WHERE ({columns_str}) IN ({', '.join('?' for _ in values_list)})"""
+
         conn = sqlite3.connect(self._db_name)
         try:
             c = conn.cursor()
-            c.executemany(query, values_list)
+            c.executemany(insert_query, values_list)
             conn.commit()
 
-            inserted_rows = self.select_with_conditions(table=table, columns=['id'],
-                                                        where_cols=columns, values_list=values_list)
-            inserted_ids = [row[0] for row in inserted_rows]
-            if len(inserted_ids) != len(values_list):
-                raise ValueError(f"{len(inserted_ids)} ids ont été récupérés sur {len(values_list)} insertions")
-            return inserted_ids
+            # Prepare a flat list of values for the SELECT query
+            flat_values = [item for sublist in values_list for item in sublist]
+            c.execute(select_query, flat_values)
+            inserted_rows = c.fetchall()
+
+            return inserted_rows
         except sqlite3.Error as e:
             conn.rollback()
             raise e
         finally:
             conn.close()
+
+    def get_buffered_data(self, data_type, key):
+        value = self.buffer[data_type].get(key)
+        if value is not None:
+            return key, value
+        return None, None
+    def get_buffered_datas(self, data_type, keys):
+        """
+        :data_type: (str): Le type de données, par exemple 'email_addresses'.
+        :keys: (collection of str): Les clés à rechercher dans le sous-dictionnaire (peut être une liste ou un set).
+        :return: Un dictionnaire contenant les paires clé-valeur pour les clés trouvées.
+        """
+        sub_dict = self.buffer.get(data_type, {})
+        buffer_dict = {key: sub_dict.get(key) for key in keys if key is not None}
+        print(f"Get buffered data for {data_type}: {buffer_dict}")
+        return buffer_dict
+    def buffering(self, data_type, dict):
+        if data_type not in self.buffer:
+            self.buffer[data_type] = {}
+        print(f"Buffering {data_type}: {dict}")
+        self.buffer[data_type].update(dict)
+
 
     # Todo ############################################################################################################
     def insert_email_addresses(self, emails_addr):
@@ -382,44 +411,20 @@ class EmailDatabase:
             email_addr: list(email)
         Returns:
         """
-        print(emails_addr)
+
         email_addr_set = set(emails_addr)
-        email_in_unique_values = self.unique_values['email_addresses']
-        addr_not_in_unique_values = email_addr_set - email_in_unique_values
-        # Step 2: Retrieve IDs and email addresses from the database
-        existing_email_addresses = self.select_with_conditions(table='EmailAddresses',
-                                                               columns=['id', 'email_address'],
-                                                               where_cols=['email_address'],
-                                                               values_list=[[addr] for addr
-                                                                            in addr_not_in_unique_values])
-
-        # Convert the result to a dictionary for easy lookup
-        existing_emails = {email: id for id, email in existing_email_addresses}
-
-        # Step 3: Insert new email addresses if necessary
-        new_emails = list(addr_not_in_unique_values - existing_emails.keys())
-
-        if new_emails:
-            self.insert_many(table='EmailAddresses',
-                             columns=['email_address'],
-                             values_list=[(email,) for email in new_emails])
-
-        all_email_addresses = self.select_with_conditions(
-            table='EmailAddresses',
-            columns=['id', 'email_address'],
-            where_cols=['email_address'],
-            values_list=[(email,) for email in emails_addr])
-        print(all_email_addresses)
-        all_email_dict = {email: id for id, email in all_email_addresses}
-        print(all_email_dict)
-        existing_emails.update(all_email_dict)
-
-        self.unique_values['email_addresses'].update(existing_emails.keys())
-
-        if len(emails_addr) != len(all_email_dict):
-            raise ValueError(f"Mismatch between the number of email addresses '{len(emails_addr)}' and the number of ids returned '{len(all_email_dict)}'")
-
-        return all_email_dict
+        buffered_data = self.get_buffered_datas('email_addresses', email_addr_set)
+        addresses_not_in_buffer = email_addr_set - set(buffered_data.keys())
+        if addresses_not_in_buffer:
+            print(f"Addresses not in buffer: {addresses_not_in_buffer}")
+            inserted_data_in_db = self.insert_many(table='EmailAddresses', columns=['email_address'],
+                                               values_list=list(addresses_not_in_buffer))
+            print(inserted_data_in_db)
+            inserted_data_in_db_dict = {email: id for id, email in inserted_data_in_db}
+            self.buffering('email_addresses', inserted_data_in_db_dict)
+            ids = inserted_data_in_db_dict.values()
+            return ids
+        return None
 
     # Todo ############################################################################################################
 
@@ -564,16 +569,19 @@ class EmailLoader:
         email_id = self.db.insert_email(email_data)
 
         if email['to_emails']:
-            email_address_to_ids = list(self.db.insert_email_addresses(email['to_emails']))
-            self.db.link_recipients([(email_id, email_address_id) for email_address_id in email_address_to_ids if email_address_id])
+            to_ids = self.db.insert_email_addresses(email['to_emails'])
+            if to_ids is not None:
+                self.db.link_recipients([(email_id, email_address_id) for email_address_id in to_ids])
 
         if email['cc_emails']:
-            email_address_cc_ids = list(self.db.insert_email_addresses(email['cc_emails']))
-            self.db.link_ccs([(email_id, email_address_id) for email_address_id in email_address_cc_ids if email_address_id])
+            cc_ids = self.db.insert_email_addresses(email['cc_emails'])
+            if cc_ids is not None:
+                self.db.link_ccs([(email_id, email_address_id) for email_address_id in cc_ids])
 
         if email['bcc_emails']:
-            email_address_bcc_ids = list(self.db.insert_email_addresses(email['bcc_emails']))
-            self.db.link_bccs([(email_id, email_address_id) for email_address_id in email_address_bcc_ids if email_address_id])
+            bcc_ids = self.db.insert_email_addresses(email['bcc_emails'])
+            if bcc_ids is not None:
+                self.db.link_bccs([(email_id, email_address_id) for email_address_id in bcc_ids])
 
         if email['attachments']:
             #attachments = [(att['id'], att['filename'], att['content']) for att in email['attachments']]
