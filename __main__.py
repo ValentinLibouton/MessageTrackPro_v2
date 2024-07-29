@@ -1,5 +1,5 @@
 from emails_managment.email_processing import EmailProcessing
-from database_managment.email_database import *
+from database_managment.email_database_old import *
 
 def paths_to_dict():
     """This is a temporary function for project development..."""
