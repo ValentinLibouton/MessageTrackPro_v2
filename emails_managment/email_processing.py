@@ -18,10 +18,6 @@ import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tabulate import tabulate
 
-def extract_name_and_email_old(email_str):
-    name, email = parseaddr(email_str)
-    return name, email
-
 
 def extract_name_and_email(fieldvalues: str):
     trimmed_field = fieldvalues.strip()
@@ -37,10 +33,7 @@ def extract_name_and_email(fieldvalues: str):
     address = clean_string(address)
     return name, address
 
-def extract_multiple_names_and_emails_old(email_str):
-    # Todo cette fonction ne fonctionne pas toujours correctement, je dois la réimplémenter moi même sans utiliser email.utils
-    addresses = getaddresses([email_str])
-    return [{'name': name, 'email': email} for name, email in addresses]
+
 
 def extract_multiple_names_and_emails(fieldvalues):
     splited_filed = fieldvalues.split(',')
@@ -194,7 +187,15 @@ def store_email(data, filepath, with_attachments):
             msg = BytesParser(policy=default).parse(f)
     else:
         msg = data
-
+    #----- START to facilitate DB insertions -----#
+    all_email_addresses = set()
+    all_aliases = set()
+    id_email_linked_to_addresses_to = set()
+    id_email_linked_to_addresses_cc = set()
+    id_email_linked_to_addresses_bcc = set()
+    id_email_linked_to_attachments_ids = set()
+    # ----- END to facilitate DB insertions -----#
+    id = hash_message(data=msg)
     attachments = []
     body = ""
     if msg.is_multipart():
@@ -209,6 +210,7 @@ def store_email(data, filepath, with_attachments):
                 content = part.get_payload(decode=True)
                 if content is not None:
                     id_attachment = hash_message(data=content)
+                    id_email_linked_to_attachments_ids.add((id, id_attachment))
                     attachments.append({
                         'id': id_attachment,
                         'filename': filename,
@@ -224,6 +226,19 @@ def store_email(data, filepath, with_attachments):
     bcc_addresses = extract_multiple_names_and_emails(msg['bcc']) if msg['bcc'] else None
     bcc_names, bcc_emails = split_names_and_emails(bcc_addresses)
 
+    all_email_addresses.add(from_email)
+    all_email_addresses.update(to_emails)
+    all_email_addresses.update(cc_emails)
+    all_email_addresses.update(bcc_emails)
+    all_aliases.add(from_name)
+    all_aliases.update(to_names)
+    all_aliases.update(cc_names)
+    all_aliases.update(bcc_names)
+    id_email_linked_to_addresses_to.update([(id, to) for to in to_emails])
+    id_email_linked_to_addresses_cc.update([(id, cc) for cc in cc_emails])
+    id_email_linked_to_addresses_bcc.update([(id, bcc) for bcc in bcc_emails])
+
+
     # Todo some tests ...
     for txt, type in {'to': to_emails, 'cc': cc_emails, 'bcc': bcc_emails}.items():
         if type:
@@ -236,7 +251,7 @@ def store_email(data, filepath, with_attachments):
     date_obj = convert_date_to_datetime(msg['date'])
     date_iso8601 = date_obj.isoformat() if date_obj else None
     data = {
-        'id': hash_message(data=msg),
+        'id': id,
         'filepath': filepath,
         'filename': os.path.basename(filepath),
         'from_name': from_name,
@@ -252,15 +267,24 @@ def store_email(data, filepath, with_attachments):
         'date_obj': date_obj,
         'date_iso8601': date_iso8601,
         'body': body,
-        'attachments': attachments
+        'attachments': attachments,
+        # below to facilitate db insertion
+        'all_email_addresses': all_email_addresses,
+        'all_aliases': all_aliases,
+        'id_email_linked_to_addresses_to': id_email_linked_to_addresses_to,
+        'id_email_linked_to_addresses_cc': id_email_linked_to_addresses_cc,
+        'id_email_linked_to_addresses_bcc': id_email_linked_to_addresses_bcc,
+        'id_email_linked_to_attachments_ids': id_email_linked_to_attachments_ids
+
     }
     return data
 
 def process_file(file_type, filepath, with_attachments):
-    email_list = []
+    email_list = []  # all datas list of dict
     if file_type == ".eml" or file_type == ".OUTLOOK.COM":
         data = store_email(None, filepath=filepath, with_attachments=with_attachments)
-        email_list.append(data)
+        email_list.append(data)  # all datas list of dict
+        
     elif file_type == ".mbox":
         try:
             mbox = mailbox.mbox(path=filepath)
@@ -283,6 +307,16 @@ class EmailProcessing:
         self.__box_extensions = ('.mbox',)
         self.__filepath_dict = {}
         self.__email_dict = {}
+        self.__aggregated_data = {
+            'all_email_addresses': set(),
+            'all_aliases': set(),
+            'id_email_linked_to_addresses_to': set(),
+            'id_email_linked_to_addresses_cc': set(),
+            'id_email_linked_to_addresses_bcc': set(),
+            'id_email_linked_to_attachments_ids': set(),
+            'emails': set(),
+            'attachments': set()}
+
         self.__time_dict = {}
         self.with_attachments = with_attachments
         self.__path = path
@@ -336,9 +370,22 @@ class EmailProcessing:
 
                 for future in as_completed(futures):
                     result = future.result()
-                    for data in result:
-                        if data['id'] not in self.__email_dict:
-                            self.__email_dict[data['id']] = data
+                    for d in result:
+                        self.__aggregated_data['emails'].update((d['id'], d['filepath'], d['filename'],
+                                                                 d['from_email'], d['subject'], d['date_obj'],
+                                                                 d['date_iso8601'], d['body']))
+                        self.__aggregated_data['attachments'].update(d['attachments'])
+                        self.__aggregated_data['all_email_addresses'].update(d['all_email_addresses'])
+                        self.__aggregated_data['all_aliases'].update(d['all_aliases'])
+                        self.__aggregated_data['id_email_linked_to_addresses_to'].update(d['id_email_linked_to_addresses_to'])
+                        self.__aggregated_data['id_email_linked_to_addresses_cc'].update(
+                            d['id_email_linked_to_addresses_cc'])
+                        self.__aggregated_data['id_email_linked_to_addresses_bcc'].update(
+                            d['id_email_linked_to_addresses_bcc'])
+                        self.__aggregated_data['id_email_linked_to_attachments_ids'].update(d['id_email_linked_to_attachments_ids'])
+
+                        if d['id'] not in self.__email_dict:
+                            self.__email_dict[d['id']] = d
                         else:
                             raise NotImplementedError("Duplicate ID found in __file_processing.")
 
@@ -375,6 +422,10 @@ class EmailProcessing:
     @property
     def get_emails_list(self):
         return self.__email_list
+
+    def get_aggregated_data(self):
+        return self.__aggregated_data
+
 
     @property
     def get_duplicates(self):

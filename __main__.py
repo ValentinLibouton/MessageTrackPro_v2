@@ -19,10 +19,5 @@ if __name__ == "__main__":
     ep = EmailProcessing(path=path, with_attachments=True)
     emails = ep.get_emails_list
     print(ep.log_execution_time)
-    el = EmailLoader(emails=emails)
-    print(el.log_execution_time)
-    input("Press ENTER to continue...")
-    for i in range(20):
-        el = EmailLoader(emails=emails)
-        print(el.log_execution_time)
-    print(ep.get_emails(limit=5000))
+    #el = EmailLoader(emails=emails)
+    #print(el.log_execution_time)
