@@ -106,13 +106,35 @@ class EmailDatabase:
         conn.close()
 
 
-    def process_simple_insertion(self, datas, table, columns):
+    def process_simple_insertion(self, table, columns, values_list):
         """Pour les tables:
             - Contacts
             - Alias
             - EmailAddress
-
         """
+        placeholders = ', '.join('?' for _ in columns)
+        columns_str = ', '.join(columns)
+        insert_query = f"""INSERT OR IGNORE INTO {table} ({columns_str}) VALUES ({placeholders})"""
+        select_query = f"""SELECT id, {columns_str} FROM {table} WHERE ({columns_str}) IN ({', '.join('?' for _ in values_list)})"""
+
+        conn = sqlite3.connect(self._db_name)
+        try:
+            c = conn.cursor()
+            c.executemany(insert_query, values_list)
+            conn.commit()
+
+            # Prepare a flat list of values for the SELECT query
+            flat_values = [item for sublist in values_list for item in sublist]
+            c.execute(select_query, flat_values)
+            inserted_rows = c.fetchall()
+
+            return inserted_rows
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
     def process_link_insertion(self, ids, table, columns):
         """Pour les tables:
             - Contacts_Alias
@@ -134,12 +156,41 @@ class EmailLoader:
         self.db = EmailDatabase(db_name)
         self._time_dict = {}
         self.datas = datas
+        self.buffer = {
+            'all_email_addresses': set(),
+            'all_aliases': set(),
+            #'id_email_linked_to_addresses_to': set(),
+            #'id_email_linked_to_addresses_cc': set(),
+            #'id_email_linked_to_addresses_bcc': set(),
+            #'id_email_linked_to_attachments_ids': set(),
+            #'emails': set(),
+            #'attachments': set()
+        }
         self._load_datas_into_db(emails=self._emails)
 
 
     def _load_datas_into_db(self):
-        self.db.
-        self.datas['all_email_addresses']
+        all_email_addresses_inserted = self.db.process_simple_insertion(table='Email_Addresses',
+                                                                        columns=['email_address'],
+                                                                        values_list=self.datas['all_email_addresses'])
+        self.buffer['all_email_addresses'].update(self.reverse_tuples(all_email_addresses_inserted))
+
+        all_aliases_inserted = self.db.process_simple_insertion(table='Alias',
+                                                                columns=['alias'],
+                                                                values_list=self.datas['all_aliases'])
+        self.buffer['all_aliases'].update(self.reverse_tuples(all_aliases_inserted))
+
+
+
+
+
+
+
+
+
+    def reverse_tuples(self, tuple_list):
+        return [t[::-1] for t in tuple_list]
+
 
     @property
     def log_execution_time(self):
@@ -157,3 +208,9 @@ class EmailLoader:
                     print(f"{text}: {minutes} minutes, {seconds} seconds")
                 else:
                     print(f"{text}: {seconds} seconds")
+
+    @property
+    def show_buffer(self, key=None):
+        if key is None:
+            return self.buffer
+        return self.buffer[key]
