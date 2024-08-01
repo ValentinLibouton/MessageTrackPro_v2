@@ -22,9 +22,9 @@ if __name__ == '__main__':
     supported_extensions = ['.outlook.com', '.eml', '.mbox', '.msg', '.pst', '.ost', '.oft', '.olm']
     file_retriever = FileRetriever(path=path, supported_extensions=supported_extensions,
                                    file_detector_class=FileDetector)
-    file_retriever.retrieve_files_path()
-    print(file_retriever.filepath_dict)
+    #file_retriever.retrieve_files_path()
+    #print(file_retriever.filepath_dict)
 
-    aggregator = EmailAggregator(hasher=hasher, file_retriever=file_retriever, email_parser=EmailParser())
-    aggregator.retrieve_and_aggregate_emails()
+    aggregator = EmailAggregator(hasher=hasher, file_retriever=file_retriever, email_parser=EmailParser)
+    #aggregator.retrieve_and_aggregate_emails()
     print(aggregator.aggregated_data_dict)
