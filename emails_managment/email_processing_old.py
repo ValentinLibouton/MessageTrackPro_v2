@@ -3,11 +3,7 @@ import email.utils
 from email.parser import BytesParser
 from email.policy import default
 import os
-import base64
-from bs4 import BeautifulSoup
-import quopri
-import re
-from email.utils import parseaddr, getaddresses
+
 
 import time
 import pytz
@@ -209,7 +205,7 @@ def store_email(data, filepath, with_attachments):
         'from_email': from_email,
         'to_names': to_names,
         'to_emails': to_emails,
-        # 'cc': msg['cc'],# Todo test en cours
+        # 'cc': msg['cc'],# Todo tests en cours
         'cc_name': cc_names,
         'cc_emails': cc_emails,
         'bcc_names': bcc_names,
@@ -226,7 +222,6 @@ def store_email(data, filepath, with_attachments):
         'id_email_linked_to_addresses_cc': id_email_linked_to_addresses_cc,
         'id_email_linked_to_addresses_bcc': id_email_linked_to_addresses_bcc,
         'id_email_linked_to_attachments_ids': id_email_linked_to_attachments_ids
-        'attachments_set':
 
     }
     return data
