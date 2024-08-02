@@ -97,14 +97,21 @@ class DateTransformer(IDateTransformer):
     def is_daylight_saving(self, date_input) -> bool:
         tz = pytz.timezone(self.timezone_name)
         try:
-            localized_date = tz.localize(date_input, is_dst=None)
+            if date_input.tzinfo is None:
+                localized_date = tz.localize(date_input, is_dst=None)
+            else:
+                localized_date = date_input.astimezone(tz)
         except pytz.AmbiguousTimeError:
             localized_date = tz.localize(date_input, is_dst=False)
         is_dst = localized_date.dst() != timedelta(0)
         return is_dst
 
 
-    def change_time_shift(self, date_input):
+    def change_time_shift(self, date_input: datetime):
+        if date_input.tzinfo is None:
+            date_input = pytz.timezone(self.timezone_name).localize(date_input)
+
+
         if self.is_daylight_saving(date_input):
             season_offset = 2 * 3600
         else:
@@ -141,10 +148,16 @@ class DateTransformer(IDateTransformer):
             '-1100': 11 * 3600,
             '-1200': 12 * 3600,
         }
+        # for substring, offset in time_shift_in_seconds.items():
+        #     if substring in date_input:
+        #         date_obj = date_obj + timedelta(seconds=offset + season_offset)
+        # target_timezone = pytz.timezone(self.timezone_name)
+        # date_obj = date_obj.replace(tzinfo=pytz.utc)
+        # date_obj = date_obj.astimezone(target_timezone)
+        # return date_obj
+
         for substring, offset in time_shift_in_seconds.items():
-            if substring in date_input:
-                date_obj = date_obj + timedelta(seconds=offset + season_offset)
-        target_timezone = pytz.timezone(self.timezone_name)
-        date_obj = date_obj.replace(tzinfo=pytz.utc)
-        date_obj = date_obj.astimezone(target_timezone)
-        return date_obj
+            if substring in date_input.strftime("%z"):
+                date_input = date_input + timedelta(seconds=offset + season_offset)
+
+        return date_input.astimezone(pytz.timezone(self.timezone_name))

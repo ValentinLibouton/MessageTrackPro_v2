@@ -23,13 +23,19 @@ class EmailParser(IEmailParser):
         msg = BytesParser(policy=policy.default).parsebytes(email_content)
         body, attachments = self.extract_body_and_attachments(msg=msg)
         date = self.transform_date(msg['date'])
+        to_names, to_addresses = self.split_names_addresses(fieldvalue=msg['to'])
         return {
-            'from': self.split_name_address(fieldvalue=msg['from']),
+            'from': self.name_address(fieldvalue=msg['from']),
             'subject': msg['subject'],
-            'date': date,
-            'to': self.split_names_addresses(fieldvalue=msg['to']),
-            'cc': self.split_names_addresses(fieldvalue=msg['cc']),
-            'bcc': self.split_names_addresses(fieldvalue=msg['bcc']),
+            'date_str': date.strftime('%Y-%m-%d %H:%M:%S'),
+            'date_obj': date,
+            'date_iso': date.isoformat(),
+            'timestamp': date.timestamp(),
+            'to': self.names_addresses(fieldvalue=msg['to']),
+            'to_names': to_names,
+            'to_addresses': to_addresses,
+            'cc': self.names_addresses(fieldvalue=msg['cc']),
+            'bcc': self.names_addresses(fieldvalue=msg['bcc']),
             'body': body,
             'attachments': attachments
         }
@@ -60,10 +66,14 @@ class EmailParser(IEmailParser):
                 continue  # Skip multipart container, go deeper
             elif content_disposition is None:
                 # This is the email body
-                if part.get_content_type() == "text/plain":
-                    body = part.get_payload(decode=True).decode(part.get_content_charset())
-                elif part.get_content_type() == "text/html" and body is None:
-                    body = part.get_payload(decode=True).decode(part.get_content_charset())
+                if part.get_content_type() in ["text/plain", "text/html"]:
+                    charset = part.get_content_charset() or 'utf-8'  # Default to 'utf-8' if charset is Non
+                    try:
+                        body_content = part.get_payload(decode=True).decode(charset)
+                    except UnicodeDecodeError:
+                        body_content = part.get_payload(decode=True).decode('utf-8', errors='replace')
+                    if part.get_content_type() == "text/plain" or body is None:
+                        body = body_content
 
             elif "attachment" in content_disposition:
                 # This is an attachment
@@ -76,15 +86,19 @@ class EmailParser(IEmailParser):
                     })
         return body, attachments
 
-    def split_name_address(self, fieldvalue: str):
-        return self.string_cleaner.split_name_address(fieldvalue)
+    def name_address(self, fieldvalue: str):
+        return self.string_cleaner.split_name_address_from_str(fieldvalue)
+
+    def names_addresses(self, fieldvalue: str):
+        return self.string_cleaner.split_names_addresses_from_str(fieldvalue)
 
     def split_names_addresses(self, fieldvalue: str):
-        return self.string_cleaner.split_names_addresses(fieldvalue)
+        list_of_tuple = self.string_cleaner.split_names_addresses_from_str(fieldvalue)
+        return self.string_cleaner.split_names_addresses_from_list(list_of_tuple)
 
     def transform_date(self, date_input):
         transformer = self.date_transformer
-        date_obj = transformer.transform_email_date(date_input=date_input)
+        date_obj = transformer._parse_email_date(date_input=date_input)
         date_obj = transformer.change_time_shift(date_input=date_obj)
         return date_obj
 

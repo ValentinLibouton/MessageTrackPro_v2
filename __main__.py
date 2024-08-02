@@ -17,14 +17,15 @@ def paths_to_dict():
 
 if __name__ == '__main__':
     path = paths_to_dict()['emails_eml']
+    #path = paths_to_dict()['all_emails']
     print(path)
     hasher = Hasher()
     supported_extensions = ['.outlook.com', '.eml', '.mbox', '.msg', '.pst', '.ost', '.oft', '.olm']
     file_retriever = FileRetriever(path=path, supported_extensions=supported_extensions,
                                    file_detector_class=FileDetector)
+    email_parser = EmailParser()
     #file_retriever.retrieve_files_path()
     #print(file_retriever.filepath_dict)
 
-    aggregator = EmailAggregator(hasher=hasher, file_retriever=file_retriever, email_parser=EmailParser)
-    #aggregator.retrieve_and_aggregate_emails()
-    print(aggregator.aggregated_data_dict)
+    aggregator = EmailAggregator(hasher=hasher, file_retriever=file_retriever, email_parser=email_parser)
+    print(aggregator.aggregated_data_dict['date_str'])

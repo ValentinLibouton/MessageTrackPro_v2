@@ -1,28 +1,3 @@
-
-def is_daylight_saving(date, timezone='Europe/Brussels'):
-    tz = pytz.timezone(timezone)
-    try:
-        localized_date = tz.localize(date, is_dst=None)
-    except pytz.AmbiguousTimeError:
-        localized_date = tz.localize(date, is_dst=False)
-    is_dst = localized_date.dst() != timedelta(0)
-    return is_dst
-
-def decode_content(part):
-    content_type = part.get_content_type()
-    content_disposition = part.get("Content-Disposition", None)
-
-    if content_type in ["text/plain", "text/html"] and (
-            content_disposition is None or "inline" in content_disposition):
-        payload = part.get_payload(decode=True)
-        charset = part.get_content_charset() or 'utf-8'  # Use the charset specified in the part, or default to 'utf-8'
-        try:
-            return payload.decode(charset, errors="replace")
-        except LookupError:
-            return payload.decode('utf-8', errors="replace")
-    return None
-
-
 def convert_date_to_datetime(date_str, target_tz="Europe/Brussels"):
     parsed_date = email.utils.parsedate(date_str)
     if parsed_date is None:

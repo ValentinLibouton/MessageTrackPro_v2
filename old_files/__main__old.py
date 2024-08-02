@@ -1,10 +1,10 @@
 from emails_managment.email_processing import EmailProcessing
-from database_managment.email_database import *
+from old_files.database_managment.email_database import *
 
 def paths_to_dict():
     """This is a temporary function for project development..."""
     paths = {}
-    with open('paths.txt', 'r') as f:
+    with open('../paths.txt', 'r') as f:
         for line in f:
             line = line.strip()
             if line:

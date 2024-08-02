@@ -1,4 +1,4 @@
-from utils.utils import *
+from old_files.utils import *
 import email.utils
 from email.parser import BytesParser
 from email.policy import default
@@ -13,7 +13,6 @@ import mailbox
 from tqdm import tqdm
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from tabulate import tabulate
 
 
 def extract_name_and_email(fieldvalues: str):

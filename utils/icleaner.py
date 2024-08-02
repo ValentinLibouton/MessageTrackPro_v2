@@ -6,11 +6,15 @@ class IStringCleaner(ABC):
         pass
 
     @abstractmethod
-    def split_name_address(self, fieldvalue: str) -> tuple:
+    def split_name_address_from_str(self, fieldvalue: str) -> tuple:
         pass
 
     @abstractmethod
-    def split_names_addresses(self, fieldvalue: str) -> list:
+    def split_names_addresses_from_str(self, fieldvalue: str) -> list:
+        pass
+
+    @abstractmethod
+    def split_names_addresses_from_list(self, list_of_name_address_tuple: list) -> tuple:
         pass
 
     @abstractmethod
