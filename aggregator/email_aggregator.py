@@ -27,6 +27,7 @@ class EmailAggregator:
 
     def add_email(self, file_path, email):
         self.__email_dict = {
+            'email_id': email['email_id'],
             'filepath': file_path,
             'filename': os.path.basename(file_path),
             'date_str': email['date_str'],

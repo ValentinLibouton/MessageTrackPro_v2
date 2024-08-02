@@ -4,12 +4,13 @@ import mailbox
 from .iemail_parser import IEmailParser
 from utils.string_cleaner import StringCleaner
 from utils.date_transformer import DateTransformer
-
+from hasher.hasher import Hasher
 
 class EmailParser(IEmailParser):
-    def __init__(self, string_cleaner=None, date_transformer=None):
+    def __init__(self, hasher: Hasher, string_cleaner=None, date_transformer=None):
         self.string_cleaner = string_cleaner if string_cleaner else StringCleaner()
         self.date_transformer = date_transformer if date_transformer else DateTransformer()
+        self.hasher = hasher
     def parse_email(self, email_content):
         """
         Analyse le contenu d'un email et retourne un dictionnaire avec les données pertinentes.
@@ -21,10 +22,12 @@ class EmailParser(IEmailParser):
         dict: Un dictionnaire contenant les données de l'email.
         """
         msg = BytesParser(policy=policy.default).parsebytes(email_content)
+        email_id = self.hasher.hash_string(data=msg)
         body, attachments = self.extract_body_and_attachments(msg=msg)
         date = self.transform_date(msg['date'])
         to_names, to_addresses = self.split_names_addresses(fieldvalue=msg['to'])
         return {
+            'email_id': email_id,
             'from': self.name_address(fieldvalue=msg['from']),
             'subject': msg['subject'],
             'date_str': date.strftime('%Y-%m-%d %H:%M:%S'),
@@ -79,8 +82,10 @@ class EmailParser(IEmailParser):
                 # This is an attachment
                 filename = part.get_filename()
                 content = part.get_payload(decode=True)
+                attachment_id = self.hasher.hash_string(data=content)
                 if content is not None:
                     attachments.append({
+                        'attachment_id': attachment_id,
                         'filename': filename,
                         'content': content
                     })

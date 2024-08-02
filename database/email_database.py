@@ -1,5 +1,5 @@
 import sqlite3
-
+from hasher.hasher import Hasher
 
 class EmailDatabase:
     def __init__(self, data: dict, db_name='database.db', sql_file='database.sql'):
@@ -15,3 +15,4 @@ class EmailDatabase:
         c.executescript(sql)
         conn.commit()
         conn.close()
+

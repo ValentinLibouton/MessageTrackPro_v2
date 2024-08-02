@@ -23,9 +23,9 @@ if __name__ == '__main__':
     supported_extensions = ['.outlook.com', '.eml', '.mbox', '.msg', '.pst', '.ost', '.oft', '.olm']
     file_retriever = FileRetriever(path=path, supported_extensions=supported_extensions,
                                    file_detector_class=FileDetector)
-    email_parser = EmailParser()
+    email_parser = EmailParser(hasher=hasher)
     #file_retriever.retrieve_files_path()
     #print(file_retriever.filepath_dict)
 
-    aggregator = EmailAggregator(hasher=hasher, file_retriever=file_retriever, email_parser=email_parser)
+    aggregator = EmailAggregator(file_retriever=file_retriever, email_parser=email_parser)
     print(aggregator.aggregated_data_dict['date_str'])
