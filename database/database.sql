@@ -32,12 +32,40 @@ CREATE TABLE IF NOT EXISTS Emails (
     id TEXT PRIMARY KEY,
     filepath TEXT,
     filename TEXT,
-    from_id INTEGER,
     subject TEXT,
-    date TEXT,
-    date_iso8601 TEXT,
     body TEXT,
     FOREIGN KEY(from_id) REFERENCES EmailAddresses(id)
+);
+
+CREATE TABLE IF NOT EXISTS Date(
+    id INTEGER PRIMARY KEY,
+    date TEXT
+);
+
+CREATE TABLE IF NOT EXISTS Email_Date(
+    email_id TEXT,
+    date_id INTEGER,
+    FOREIGN KEY(email_id) REFERENCES Emails(id)
+    FOREIGN KEY(date_id) REFERENCES Date(id)
+);
+
+CREATE TABLE IF NOT EXISTS Timestamp(
+    id INTEGER PRIMARY KEY,
+    timestamp FLOAT
+);
+
+CREATE TABLE IF NOT EXISTS Email_Timestamp(
+    email_id TEXT,
+    timestamp_id FLOAT,
+    FOREIGN KEY(email_id) REFERENCES Emails(id)
+    FOREIGN KEY(timestamp_id) REFERENCES Timestamp(id)
+);
+
+CREATE TABLE IF NOT EXISTS Email_From(
+    email_id TEXT,
+    email_address_id INTEGER,
+    FOREIGN KEY(email_id) REFERENCES Emails(id),
+    FOREIGN KEY(email_address_id) REFERENCES EmailAddresses(id)
 );
 
 CREATE TABLE IF NOT EXISTS Email_To(

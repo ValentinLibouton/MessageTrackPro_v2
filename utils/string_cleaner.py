@@ -44,3 +44,6 @@ class StringCleaner(IStringCleaner):
 
     def contains_repeated_char(self, string: str, char: str) -> bool:
         return string.count(char) > 1
+
+    def to_lower_and_trim(self, string: str) -> str:
+        return string.lower().strip()
