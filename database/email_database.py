@@ -3,9 +3,6 @@ from sql_request import SQLRequest
 from utils.string_cleaner import StringCleaner
 
 
-
-
-
 class EmailDatabase:
     def __init__(self, data: dict, db_name='database.db', sql_file='database.sql', string_cleaner=None, sql_requests=None):
         self.string_cleaner = string_cleaner if string_cleaner else StringCleaner()

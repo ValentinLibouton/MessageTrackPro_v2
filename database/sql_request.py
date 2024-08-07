@@ -86,3 +86,8 @@ class SQLRequest:
     @staticmethod
     def link_attachment_id_to_email_id():
         return "INSERT OR IGNORE Email_Attachments (email_id, attachment_id) VALUES (?, ?)"
+
+def list_static_methods(cls):
+    import inspect
+    static_methods = []
+    for name, func in inspect.getmembers_static()
