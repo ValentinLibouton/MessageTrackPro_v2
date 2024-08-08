@@ -27,7 +27,8 @@ class EmailDatabase:
         last_name = self.string_cleaner.to_lower_and_trim(last_name)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert_contact(), (first_name, last_name))
+            c.execute(self.sql_requests.insert(table='Contacts',
+                                               columns=['first_name', 'last_name']), (first_name, last_name))
             contact_id = c.lastrowid
             if contact_id == 0 and return_existing_id:
                 c.execute(self.sql_requests.select_contact_id(), (first_name, last_name))
@@ -38,7 +39,8 @@ class EmailDatabase:
         alias = self.string_cleaner.to_lower_and_trim(alias)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert_alias(), (alias,))
+            c.execute(self.sql_requests.insert(table='Alias',
+                                               columns=['alias']), (alias,))
             alias_id = c.lastrowid
             if alias_id == 0 and return_existing_id:
                 c.execute(self.sql_requests.select_alias_id(), (alias,))
@@ -48,14 +50,17 @@ class EmailDatabase:
     def link_contact_id_to_alias_id(self, contact_id, alias_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.link_contact_id_to_alias_id(), (contact_id, alias_id))
+            c.execute(self.sql_requests.link(table='Contacts_Alias',
+                                             pk_1=contact_id,
+                                             pk_2=alias_id), (contact_id, alias_id))
             conn.commit()
 
     def insert_email_address(self, email_address, return_existing_id=False):
         email_address = self.string_cleaner.to_lower_and_trim(email_address)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert_email_address(), (email_address,))
+            c.execute(self.sql_requests.insert(table='EmailAddresses',
+                                               columns=['email_address']), (email_address,))
             address_id = c.lastrowid
             if address_id == 0 and return_existing_id:
                 c.execute(self.sql_requests.select_email_address_id(), (email_address,))
@@ -65,7 +70,9 @@ class EmailDatabase:
     def link_contact_id_to_email_address_id(self, contact_id, address_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.link_contact_id_to_email_address_id(), (contact_id, address_id))
+            c.execute(self.sql_requests.link(table='Contacts_EmailAddresses',
+                                             pk_1=contact_id,
+                                             pk_2=address_id), (contact_id, address_id))
             conn.commit()
 
     #--------------------------
@@ -73,7 +80,9 @@ class EmailDatabase:
     def insert_email(self, id, filepath, filename, subject, body, return_existing_id=False):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert_email(), (id, filepath, filename, subject, body))
+            c.execute(self.sql_requests.insert(table='Emails',
+                                               columns=['id', 'filepath', 'filename', 'subject', 'body'])
+                      , (id, filepath, filename, subject, body))
             email_id = c.lastrowid
             if email_id == 0 and return_existing_id:
                 c.execute(self.sql_requests.select_email_id(), (email_id,))
@@ -84,7 +93,8 @@ class EmailDatabase:
     def insert_date(self, date, return_existing_id=False):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert_date(), (date,))
+            c.execute(self.sql_requests.insert(table='Date',
+                                               columns=['date']), (date,))
             date_id = c.lastrowid
             if date_id == 0 and return_existing_id:
                 c.execute(self.sql_requests.select_date_id(), (date,))
@@ -94,14 +104,17 @@ class EmailDatabase:
     def link_date_id_to_email_id(self, email_id, date_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.link_date_id_to_email_id(), (email_id, date_id))
+            c.execute(self.sql_requests.link(table='Email_Date',
+                                             pk_1=email_id,
+                                             pk_2=date_id), (email_id, date_id))
             conn.commit()
 
     # --------------------------
     def insert_timestamp(self, timestamp, return_existing_id=False):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert_timestamp(), (timestamp,))
+            c.execute(self.sql_requests.insert(table='Timestamp',
+                                               columns=['timestamp']), (timestamp,))
             timestamp_id = c.lastrowid
             if timestamp_id == 0 and return_existing_id:
                 c.execute(self.sql_requests.select_timestamp_id(), (timestamp,))
@@ -111,37 +124,49 @@ class EmailDatabase:
     def link_timestamp_id_to_email_id(self, email_id, timestamp_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.link_timestamp_id_to_email_id(), (email_id, timestamp_id))
+            c.execute(self.sql_requests.link(table='Email_Timestamp',
+                                             pk_1=email_id,
+                                             pk_2=timestamp_id), (email_id, timestamp_id))
             conn.commit()
 
     def link_from_email_address_id_to_email_id(self, email_id, email_address_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.link_from_email_address_id_to_email_id(), (email_id, email_address_id))
+            c.execute(self.sql_requests.link(table='Email_From',
+                                             pk_1=email_id,
+                                             pk_2=email_address_id), (email_id, email_address_id))
             conn.commit()
 
     def link_to_email_address_id_to_email_id(self, email_id, email_address_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.link_to_email_address_id_to_email_id(), (email_id, email_address_id))
+            c.execute(self.sql_requests.link(table='Email_To',
+                                             pk_1=email_id,
+                                             pk_2=email_address_id), (email_id, email_address_id))
             conn.commit()
 
     def link_cc_email_address_id_to_email_id(self, email_id, email_address_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.link_cc_email_address_id_to_email_id(), (email_id, email_address_id))
+            c.execute(self.sql_requests.link(table='Email_Cc',
+                                             pk_1=email_id,
+                                             pk_2=email_address_id), (email_id, email_address_id))
             conn.commit()
 
     def link_bcc_email_address_id_to_email_id(self, email_id, email_address_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.link_bcc_email_address_id_to_email_id(), (email_id, email_address_id))
+            c.execute(self.sql_requests.link(table='Email_Bcc',
+                                             pk_1=email_id,
+                                             pk_2=email_address_id), (email_id, email_address_id))
             conn.commit()
 
     def insert_attachment(self, id, filename, content, return_existing_id=False):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert_attachment(), (id, filename, content))
+            c.execute(self.sql_requests.insert(table='Attachments',
+                                               columns=['id', 'filename', 'content'])
+                      , (id, filename, content))
             attachment_id = c.lastrowid
             if attachment_id == 0 and return_existing_id:
                 c.execute(self.sql_requests.select_attachment_id(), (attachment_id,))
@@ -151,7 +176,9 @@ class EmailDatabase:
     def link_attachment_id_to_email_id(self, email_id, attachment_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.link_attachment_id_to_email_id(), (email_id, attachment_id))
+            c.execute(self.sql_requests.link(table='Email_Attachments',
+                                             pk_1=email_id,
+                                             pk_2=attachment_id), (email_id, attachment_id))
             conn.commit()
 
 
