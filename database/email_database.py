@@ -31,7 +31,8 @@ class EmailDatabase:
                                                columns=['first_name', 'last_name']), (first_name, last_name))
             contact_id = c.lastrowid
             if contact_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_contact_id(), (first_name, last_name))
+                c.execute(self.sql_requests.select_primary_key_from(table='Contacts',
+                                                                    columns=['first_name', 'last_name']), (first_name, last_name))
                 contact_id = c.fetchone()[0]
             return contact_id
 
@@ -43,7 +44,8 @@ class EmailDatabase:
                                                columns=['alias']), (alias,))
             alias_id = c.lastrowid
             if alias_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_alias_id(), (alias,))
+                c.execute(self.sql_requests.select_primary_key_from(table='Alias',
+                                                                    columns=['alias']), (alias,))
                 alias_id = c.fetchone()[0]
             return alias_id
 
@@ -63,7 +65,8 @@ class EmailDatabase:
                                                columns=['email_address']), (email_address,))
             address_id = c.lastrowid
             if address_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_email_address_id(), (email_address,))
+                c.execute(self.sql_requests.select_primary_key_from(table='EmailAddresses',
+                                                                    columns=['email_address']), (email_address,))
                 address_id = c.fetchone()[0]
             return address_id
 
@@ -85,7 +88,8 @@ class EmailDatabase:
                       , (id, filepath, filename, subject, body))
             email_id = c.lastrowid
             if email_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_email_id(), (email_id,))
+                c.execute(self.sql_requests.select_primary_key_from(table='Emails',
+                                                                    columns=['id']), (email_id,))
                 email_id = c.fetchone()[0]
             return email_id
 
@@ -97,7 +101,8 @@ class EmailDatabase:
                                                columns=['date']), (date,))
             date_id = c.lastrowid
             if date_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_date_id(), (date,))
+                c.execute(self.sql_requests.select_primary_key_from(table='Date',
+                                                                    columns=['date']), (date,))
                 date_id = c.fetchone()[0]
             return date_id
 
@@ -117,7 +122,8 @@ class EmailDatabase:
                                                columns=['timestamp']), (timestamp,))
             timestamp_id = c.lastrowid
             if timestamp_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_timestamp_id(), (timestamp,))
+                c.execute(self.sql_requests.select_primary_key_from(table='Timestamp',
+                                                                    columns=['timestamp']), (timestamp,))
                 timestamp_id = c.fetchone()[0]
             return timestamp_id
 
@@ -169,7 +175,8 @@ class EmailDatabase:
                       , (id, filename, content))
             attachment_id = c.lastrowid
             if attachment_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_attachment_id(), (attachment_id,))
+                c.execute(self.sql_requests.select_primary_key_from(table='Attachments',
+                                                                    columns=['id']), (attachment_id,))
                 attachment_id = c.fetchone()[0]
             return attachment_id
 

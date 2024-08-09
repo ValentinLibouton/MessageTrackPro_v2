@@ -1,6 +1,7 @@
 from hasher.ihashable import IHasher
 from aggregator.file_retriever import FileRetriever
 from parser.email_parser import EmailParser
+from database.email_database import EmailDatabase
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import sys
@@ -10,9 +11,13 @@ import os
 
 
 class EmailAggregator:
-    def __init__(self, file_retriever: FileRetriever, email_parser: EmailParser, with_attachments=False):
+    def __init__(self, file_retriever: FileRetriever,
+                 email_parser: EmailParser,
+                 email_database: EmailDatabase,
+                 with_attachments=False):
         self.__file_retriever = file_retriever
         self._email_parser = email_parser
+        self._email_database = email_database if email_database else EmailDatabase()
         self.__email_dict = {}
 
         self.retrieve_and_aggregate_emails()
@@ -42,6 +47,7 @@ class EmailAggregator:
             'body': email['body'],
             'attachments': email['attachments']
         }
+        ed = self._email_database
 
     def add_emails(self, emails):
         with ProcessPoolExecutor() as executor:
