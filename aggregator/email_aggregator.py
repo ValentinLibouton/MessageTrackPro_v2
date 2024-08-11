@@ -8,8 +8,6 @@ import sys
 import os
 
 
-
-
 class EmailAggregator:
     def __init__(self, file_retriever: FileRetriever,
                  email_parser: EmailParser,
@@ -17,9 +15,7 @@ class EmailAggregator:
                  with_attachments=False):
         self.__file_retriever = file_retriever
         self._email_parser = email_parser
-        self._email_database = email_database if email_database else EmailDatabase()
-        self.__email_dict = {}
-
+        self.__email_database = email_database
         self.retrieve_and_aggregate_emails()
 
 
@@ -31,23 +27,8 @@ class EmailAggregator:
         self.process_email_files(mbox_list)
 
     def add_email(self, file_path, email):
-        self.__email_dict = {
-            'email_id': email['email_id'],
-            'filepath': file_path,
-            'filename': os.path.basename(file_path),
-            'date_str': email['date_str'],
-            'timestamp': email['timestamp'],
-            'subject': email['subject'],
-            'from': email['from'],
-            'to': email['to'],
-            'to_names': email['to_names'],
-            'to_addresses': email['to_addresses'],
-            'cc': email['cc'],
-            'bcc': email['bcc'],
-            'body': email['body'],
-            'attachments': email['attachments']
-        }
-        ed = self._email_database
+        [self.__email_database.insert_alias(alias=name) for name in email['from_name']]
+
 
     def add_emails(self, emails):
         with ProcessPoolExecutor() as executor:
@@ -82,6 +63,7 @@ class EmailAggregator:
     def process_email_file(self, file_path):
         with open(file_path, 'rb') as f:
             email_content = f.read()
+            print(f"Fichier: {file_path}")
             email = self._email_parser.parse_email(email_content=email_content)
             return file_path, email
 
@@ -92,4 +74,4 @@ class EmailAggregator:
 
     @property
     def aggregated_data_dict(self):
-        return self.__email_dict
+        pass

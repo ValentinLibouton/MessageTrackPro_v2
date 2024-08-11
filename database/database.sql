@@ -1,12 +1,12 @@
 CREATE TABLE IF NOT EXISTS Contacts (
     id INTEGER PRIMARY KEY,
-    first_name TEXT,
-    last_name TEXT
+    first_name TEXT COLLATE NOCASE,
+    last_name TEXT COLLATE NOCASE
 );
 
 CREATE TABLE IF NOT EXISTS Alias (
     id INTEGER PRIMARY KEY,
-    alias TEXT
+    alias TEXT UNIQUE COLLATE NOCASE --Case-Insensitive Uniqueness
 );
 
 CREATE TABLE IF NOT EXISTS Contacts_Alias(
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS Contacts_Alias(
 
 CREATE TABLE IF NOT EXISTS EmailAddresses(
     id INTEGER PRIMARY KEY,
-    email_address TEXT UNIQUE
+    email_address TEXT UNIQUE COLLATE NOCASE
 );
 
 CREATE TABLE IF NOT EXISTS Contacts_EmailAddresses(
@@ -30,34 +30,34 @@ CREATE TABLE IF NOT EXISTS Contacts_EmailAddresses(
 
 CREATE TABLE IF NOT EXISTS Emails (
     id TEXT PRIMARY KEY,
-    filepath TEXT,
+    filepath TEXT C,
     filename TEXT,
     subject TEXT,
     body TEXT,
-    FOREIGN KEY(from_id) REFERENCES EmailAddresses(id)
+    FOREIGN KEY(id) REFERENCES EmailAddresses(id)
 );
 
 CREATE TABLE IF NOT EXISTS Date(
     id INTEGER PRIMARY KEY,
-    date TEXT
+    date TEXT UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS Email_Date(
     email_id TEXT,
     date_id INTEGER,
-    FOREIGN KEY(email_id) REFERENCES Emails(id)
+    FOREIGN KEY(email_id) REFERENCES Emails(id),
     FOREIGN KEY(date_id) REFERENCES Date(id)
 );
 
 CREATE TABLE IF NOT EXISTS Timestamp(
     id INTEGER PRIMARY KEY,
-    timestamp FLOAT
+    timestamp REAL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS Email_Timestamp(
     email_id TEXT,
-    timestamp_id FLOAT,
-    FOREIGN KEY(email_id) REFERENCES Emails(id)
+    timestamp_id REAL,
+    FOREIGN KEY(email_id) REFERENCES Emails(id),
     FOREIGN KEY(timestamp_id) REFERENCES Timestamp(id)
 );
 

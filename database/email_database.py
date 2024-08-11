@@ -1,12 +1,11 @@
 import sqlite3
-from sql_request import SQLRequest
+from database.sql_request import SQLRequest
 from utils.string_cleaner import StringCleaner
 
 
 class EmailDatabase:
-    def __init__(self, data: dict, db_name='database.db', sql_file='database.sql', string_cleaner=None, sql_requests=None):
+    def __init__(self, db_name='database.db', sql_file='database/database.sql', string_cleaner=None, sql_requests=None):
         self.string_cleaner = string_cleaner if string_cleaner else StringCleaner()
-        self.data = data
         self.db_name = db_name
         self.sql_file = sql_file
         self.sql_requests = sql_requests if sql_requests else SQLRequest()

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 class IStringCleaner(ABC):
     @abstractmethod
-    def clean(self, string: str) -> str:
+    def remove_chars(self, string: str) -> str:
         pass
 
     @abstractmethod
@@ -19,4 +19,12 @@ class IStringCleaner(ABC):
 
     @abstractmethod
     def contains_repeated_char(self, string: str, char: str) -> bool:
+        pass
+
+    @abstractmethod
+    def to_lower_and_trim(self, string: str) -> str:
+        pass
+
+    @abstractmethod
+    def replace_chars_by_char(self, fieldvalue, current_chars: list, new_char: str):
         pass

@@ -22,23 +22,38 @@ class EmailParser(IEmailParser):
         dict: Un dictionnaire contenant les données de l'email.
         """
         msg = BytesParser(policy=policy.default).parsebytes(email_content)
-        email_id = self.hasher.hash_string(data=msg)
+        # print(f"msg keys: {msg.keys()}")
+        email_id = self.hasher.hash_string(data=msg.as_bytes())
         body, attachments = self.extract_body_and_attachments(msg=msg)
+        # print(f"Date: {msg['date']}")
         date = self.transform_date(msg['date'])
+        from_name, from_address = self.split_names_addresses(fieldvalue=msg['from'])
+        from_name = self.string_cleaner.replace_chars_by_char(fieldvalue=from_name, char='.', new_char=' ')
         to_names, to_addresses = self.split_names_addresses(fieldvalue=msg['to'])
+        to_names = self.string_cleaner.replace_chars_by_char(fieldvalue=to_names, char='.', new_char=' ')
+        cc_names, cc_addresses = self.split_names_addresses(fieldvalue=msg['cc'])
+        cc_names = self.string_cleaner.replace_chars_by_char(fieldvalue=cc_names, char='.', new_char=' ')
+        bcc_names, bcc_addresses = self.split_names_addresses(fieldvalue=msg['bcc'])
+        bcc_names = self.string_cleaner.replace_chars_by_char(fieldvalue=bcc_names, char='.', new_char=' ')
         return {
             'email_id': email_id,
-            'from': self.name_address(fieldvalue=msg['from']),
+            # 'from': self.name_address(fieldvalue=msg['from']),
+            'from_name': from_name,
+            'from_address': from_address,
             'subject': msg['subject'],
             'date_str': date.strftime('%Y-%m-%d %H:%M:%S'),
             'date_obj': date,
             'date_iso': date.isoformat(),
             'timestamp': date.timestamp(),
-            'to': self.names_addresses(fieldvalue=msg['to']),
+            # 'to': self.names_addresses(fieldvalue=msg['to']),
             'to_names': to_names,
             'to_addresses': to_addresses,
-            'cc': self.names_addresses(fieldvalue=msg['cc']),
-            'bcc': self.names_addresses(fieldvalue=msg['bcc']),
+            # 'cc': self.names_addresses(fieldvalue=msg['cc']),
+            'cc_names': cc_names,
+            'cc_addresses': cc_addresses,
+            # 'bcc': self.names_addresses(fieldvalue=msg['bcc']),
+            'bcc_names': bcc_names,
+            'bcc_addresses': bcc_addresses,
             'body': body,
             'attachments': attachments
         }
@@ -82,21 +97,20 @@ class EmailParser(IEmailParser):
                 # This is an attachment
                 filename = part.get_filename()
                 content = part.get_payload(decode=True)
-                attachment_id = self.hasher.hash_string(data=content)
                 if content is not None:
+                    attachment_id = self.hasher.hash_string(data=content)
                     attachments.append({
                         'attachment_id': attachment_id,
                         'filename': filename,
                         'content': content
                     })
+                else:
+                    # Handle the case where content is None
+                    print(f"Warning: Attachment {filename} has no content and was skipped.")
         return body, attachments
 
-    def name_address(self, fieldvalue: str):
-        return self.string_cleaner.split_name_address_from_str(fieldvalue)
 
-    def names_addresses(self, fieldvalue: str):
-        return self.string_cleaner.split_names_addresses_from_str(fieldvalue)
-
+    # Todo les méthodes ci-dessous ne sont pas indispensables
     def split_names_addresses(self, fieldvalue: str):
         list_of_tuple = self.string_cleaner.split_names_addresses_from_str(fieldvalue)
         return self.string_cleaner.split_names_addresses_from_list(list_of_tuple)

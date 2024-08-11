@@ -3,6 +3,7 @@ from aggregator.email_aggregator import EmailAggregator
 from aggregator.file_retriever import FileRetriever
 from aggregator.file_detector import FileDetector
 from parser.email_parser import EmailParser
+from database.email_database import EmailDatabase
 
 def paths_to_dict():
     """This is a temporary function for project development..."""
@@ -26,6 +27,5 @@ if __name__ == '__main__':
     email_parser = EmailParser(hasher=hasher)
     #file_retriever.retrieve_files_path()
     #print(file_retriever.filepath_dict)
-
-    aggregator = EmailAggregator(file_retriever=file_retriever, email_parser=email_parser)
-    print(aggregator.aggregated_data_dict['date_str'])
+    email_database = EmailDatabase()
+    aggregator = EmailAggregator(file_retriever=file_retriever, email_parser=email_parser, email_database=email_database)
