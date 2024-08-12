@@ -8,8 +8,8 @@ from hasher.hasher import Hasher
 
 class EmailParser(IEmailParser):
     def __init__(self, hasher: Hasher, string_cleaner=None, date_transformer=None):
-        self.string_cleaner = string_cleaner if string_cleaner else StringCleaner()
-        self.date_transformer = date_transformer if date_transformer else DateTransformer()
+        self.sc = string_cleaner if string_cleaner else StringCleaner()
+        self.dt = date_transformer if date_transformer else DateTransformer()
         self.hasher = hasher
     def parse_email(self, email_content):
         """
@@ -26,18 +26,16 @@ class EmailParser(IEmailParser):
         email_id = self.hasher.hash_string(data=msg.as_bytes())
         body, attachments = self.extract_body_and_attachments(msg=msg)
         # print(f"Date: {msg['date']}")
-        date = self.transform_date(msg['date'])
-        from_name, from_address = self.split_names_addresses(fieldvalue=msg['from'])
-        from_name = self.string_cleaner.replace_chars_by_char(fieldvalue=from_name, char='.', new_char=' ')
-        to_names, to_addresses = self.split_names_addresses(fieldvalue=msg['to'])
-        to_names = self.string_cleaner.replace_chars_by_char(fieldvalue=to_names, char='.', new_char=' ')
-        cc_names, cc_addresses = self.split_names_addresses(fieldvalue=msg['cc'])
-        cc_names = self.string_cleaner.replace_chars_by_char(fieldvalue=cc_names, char='.', new_char=' ')
-        bcc_names, bcc_addresses = self.split_names_addresses(fieldvalue=msg['bcc'])
-        bcc_names = self.string_cleaner.replace_chars_by_char(fieldvalue=bcc_names, char='.', new_char=' ')
+        date = self._transform_date(msg['date'])
+
+        from_name, from_address = self._parse_names_addresses(data=msg['from'])
+        to_names, to_addresses = self._parse_names_addresses(data=msg['to'])
+        cc_names, cc_addresses = self._parse_names_addresses(data=msg['cc'])
+        bcc_names, bcc_addresses = self._parse_names_addresses(data=msg['bcc'])
+
+
         return {
             'email_id': email_id,
-            # 'from': self.name_address(fieldvalue=msg['from']),
             'from_name': from_name,
             'from_address': from_address,
             'subject': msg['subject'],
@@ -45,13 +43,10 @@ class EmailParser(IEmailParser):
             'date_obj': date,
             'date_iso': date.isoformat(),
             'timestamp': date.timestamp(),
-            # 'to': self.names_addresses(fieldvalue=msg['to']),
             'to_names': to_names,
             'to_addresses': to_addresses,
-            # 'cc': self.names_addresses(fieldvalue=msg['cc']),
             'cc_names': cc_names,
             'cc_addresses': cc_addresses,
-            # 'bcc': self.names_addresses(fieldvalue=msg['bcc']),
             'bcc_names': bcc_names,
             'bcc_addresses': bcc_addresses,
             'body': body,
@@ -109,16 +104,16 @@ class EmailParser(IEmailParser):
                     print(f"Warning: Attachment {filename} has no content and was skipped.")
         return body, attachments
 
+    def _parse_names_addresses(self, data):
+        list_names_and_addresses = self.sc.split_name_address(fieldvalue=data)
+        names, addresses = self.sc.separate_names_and_addresses_from_list(list_names_and_addresses)
+        names = self.sc.replace_chars_by_char(fieldvalue=names, current_chars={'.'}, new_char=' ')
+        return names, addresses
 
-    # Todo les méthodes ci-dessous ne sont pas indispensables
-    def split_names_addresses(self, fieldvalue: str):
-        list_of_tuple = self.string_cleaner.split_names_addresses_from_str(fieldvalue)
-        return self.string_cleaner.split_names_addresses_from_list(list_of_tuple)
 
-    def transform_date(self, date_input):
-        transformer = self.date_transformer
-        date_obj = transformer._parse_email_date(date_input=date_input)
-        date_obj = transformer.change_time_shift(date_input=date_obj)
+    def _transform_date(self, date_input):
+        date_obj = self.dt.parse_email_date(date_input=date_input)
+        date_obj = self.dt.change_time_shift(date_input=date_obj)
         return date_obj
 
 

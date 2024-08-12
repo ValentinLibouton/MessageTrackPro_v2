@@ -7,7 +7,7 @@ class Hasher(IHasher):
     def __init__(self, algorithm='sha256'):
         self.algorithm = algorithm
 
-    def hash_string(self, data:str) -> str:
+    def hash_string(self, data) -> str:
         if isinstance(data, bytes):
             msg_bytes = data
         else:

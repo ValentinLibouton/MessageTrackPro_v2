@@ -13,21 +13,29 @@ class EmailAggregator:
                  email_parser: EmailParser,
                  email_database: EmailDatabase,
                  with_attachments=False):
-        self.__file_retriever = file_retriever
-        self._email_parser = email_parser
-        self.__email_database = email_database
+        self._file_retriever = file_retriever
+        self._ep = email_parser
+        self._db = email_database
         self.retrieve_and_aggregate_emails()
 
 
     def retrieve_and_aggregate_emails(self):
-        self.__file_retriever.retrieve_files_path()
-        email_list = self.__file_retriever.filepath_dict.get('emails', [])
-        mbox_list = self.__file_retriever.filepath_dict.get('mbox', [])
+        self._file_retriever.retrieve_files_path()
+        email_list = self._file_retriever.filepath_dict.get('emails', [])
+        mbox_list = self._file_retriever.filepath_dict.get('mbox', [])
         self.process_email_files(email_list)
         self.process_email_files(mbox_list)
 
     def add_email(self, file_path, email):
-        [self.__email_database.insert_alias(alias=name) for name in email['from_name']]
+        email_id = self._db.insert_email(id=email['email_id'], filepath=file_path, filename=os.path.basename(file_path), subject=email['subject'], body=email['body'])
+        for names in [email['from_name'], email['to_names'], email['cc_names'], email['bcc_names']]:
+            [self._db.insert_alias(alias=name) for name in names]
+
+        id_from = [self._db.insert_email_address(email_address=address, return_existing_id=True) for address in email['from_address']]
+        print(f"id_from: {id_from}")
+        self._db.link_from_email_address_id_to_email_id(email_id, email_address_ids=id_from)
+
+
 
 
     def add_emails(self, emails):
@@ -63,13 +71,13 @@ class EmailAggregator:
     def process_email_file(self, file_path):
         with open(file_path, 'rb') as f:
             email_content = f.read()
-            print(f"Fichier: {file_path}")
-            email = self._email_parser.parse_email(email_content=email_content)
+            #print(f"Fichier: {file_path}")
+            email = self._ep.parse_email(email_content=email_content)
             return file_path, email
 
     def process_mbox_file(self, message, file_path):
         email_content = message.as_bytes()
-        email = self._email_parser.parse_email(email_content=email_content)
+        email = self._ep.parse_email(email_content=email_content)
         return file_path, email
 
     @property

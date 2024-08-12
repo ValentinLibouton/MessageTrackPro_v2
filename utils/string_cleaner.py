@@ -1,4 +1,4 @@
-from .icleaner import IStringCleaner
+from .istring_cleaner import IStringCleaner
 class StringCleaner(IStringCleaner):
     def __init__(self, exclude_chars=None):
         if exclude_chars is None:
@@ -21,35 +21,28 @@ class StringCleaner(IStringCleaner):
         else:
             raise TypeError(f"Unsupported type: {type(fieldvalue)}")
 
-    def split_name_address_from_str(self, fieldvalue: str) -> tuple:
-        """For e-mail address fields"""
-        if fieldvalue is None:
-            return None, None
-        trimmed_field = fieldvalue.strip()
-        last_space_index = trimmed_field.rfind(' ')
-
-        if last_space_index == -1:
-            address = self.remove_chars(trimmed_field)
-            return '', address
-
-        name = trimmed_field[:last_space_index]
-        address = trimmed_field[last_space_index + 1:]
-        name = self.remove_chars(name)
-        address = self.remove_chars(address)
-        return name, address
-
-    def split_names_addresses_from_str(self, fieldvalue: str) -> list:
-        """For e-mail address fields"""
+    def split_name_address(self, fieldvalue: str) -> list:
         if fieldvalue is None:
             return None
+        names_address = []
         split_filed = fieldvalue.split(',')
-        extracted_list = []
         for field in split_filed:
-            name, email = self.split_name_address_from_str(field)
-            extracted_list.append((name, email))
-        return extracted_list
+            trimmed_field = self.to_lower_and_trim(string=field)
+            last_space_index = trimmed_field.rfind(' ')
 
-    def split_names_addresses_from_list(self, list_of_name_address_tuple: list) -> tuple:
+            if last_space_index == -1:
+                address = self.remove_chars(trimmed_field)
+                names_address.append(('', address))
+            else:
+                name = trimmed_field[:last_space_index]
+                address = trimmed_field[last_space_index+1:]
+                name = self.remove_chars(name)
+                address = self.remove_chars(address)
+                names_address.append((name, address))
+        return names_address
+
+
+    def separate_names_and_addresses_from_list(self, list_of_name_address_tuple: list) -> tuple:
         """For e-mail address fields"""
         if not list_of_name_address_tuple:
             return [], []
@@ -62,15 +55,15 @@ class StringCleaner(IStringCleaner):
     def to_lower_and_trim(self, string: str) -> str:
         return string.lower().strip()
 
-    def replace_chars_by_char(self, fieldvalue, current_chars: list, new_char: str):
+    def replace_chars_by_char(self, fieldvalue, current_chars, new_char: str):
         if fieldvalue is None:
             return None
         elif isinstance(fieldvalue, list):
-            return [self.replace_chars_by_char(element, current_chars) for element in fieldvalue]
+            return [self.replace_chars_by_char(element, current_chars, new_char) for element in fieldvalue]
         elif isinstance(fieldvalue, set):
-            return {self.replace_chars_by_char(element, current_chars) for element in fieldvalue}
+            return {self.replace_chars_by_char(element, current_chars, new_char) for element in fieldvalue}
         elif isinstance(fieldvalue, tuple):
-            return tuple(self.replace_char(element, current_chars) for element in fieldvalue)
+            return tuple(self.replace_chars_by_char(element, current_chars, new_char) for element in fieldvalue)
         elif isinstance(fieldvalue, str):
             for char in current_chars:
                 fieldvalue = fieldvalue.replace(char, new_char)

@@ -19,7 +19,7 @@ class DateTransformer(IDateTransformer):
         Retourne:
         str: La date formatée.
         """
-        date_obj = self._parse_email_date(date_input)
+        date_obj = self.parse_email_date(date_input)
         if date_obj is None:
             raise ValueError(f"Invalid email date input: {date_input}")
         return date_obj.strftime(self.date_format)
@@ -34,7 +34,7 @@ class DateTransformer(IDateTransformer):
         Retourne:
         str: La date formatée.
         """
-        date_obj = self._parse_generic_date(date_input)
+        date_obj = self.parse_generic_date(date_input)
         if date_obj is None:
             raise ValueError(f"Invalid generic date input: {date_input}")
         return date_obj.strftime(self.date_format)
@@ -49,9 +49,9 @@ class DateTransformer(IDateTransformer):
         Retourne:
         bool: True si l'élément est une date valide, False sinon.
         """
-        return self._parse_email_date(date_input) is not None or self._parse_generic_date(date_input) is not None
+        return self.parse_email_date(date_input) is not None or self.parse_generic_date(date_input) is not None
 
-    def _parse_email_date(self, date_input):
+    def parse_email_date(self, date_input):
         """
         Analyse l'élément date provenant d'un email pour le transformer en objet datetime.
 
@@ -70,7 +70,7 @@ class DateTransformer(IDateTransformer):
                 pass
         return None
 
-    def _parse_generic_date(self, date_input):
+    def parse_generic_date(self, date_input):
         """
         Analyse l'élément date générique pour le transformer en objet datetime.
 

@@ -19,8 +19,8 @@ class SQLRequest:
         return f"""INSERT OR IGNORE INTO {table} ({columns_str}) VALUES ({placeholders})"""
 
     @staticmethod
-    def link(table:str, pk_1:str, pk_2:str):
-        return f"INSERT OR IGNORE {table} ({pk_1}, {pk_2}) VALUES (?, ?)"
+    def link(table: str, col_name_1: str, col_name_2: str):
+        return f"""INSERT OR IGNORE {table} ({col_name_1}, {col_name_2}) VALUES (?, ?)"""
 
 
 def list_static_methods(cls):

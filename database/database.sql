@@ -30,11 +30,10 @@ CREATE TABLE IF NOT EXISTS Contacts_EmailAddresses(
 
 CREATE TABLE IF NOT EXISTS Emails (
     id TEXT PRIMARY KEY,
-    filepath TEXT C,
+    filepath TEXT,
     filename TEXT,
     subject TEXT,
-    body TEXT,
-    FOREIGN KEY(id) REFERENCES EmailAddresses(id)
+    body TEXT
 );
 
 CREATE TABLE IF NOT EXISTS Date(

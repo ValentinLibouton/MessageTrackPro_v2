@@ -52,8 +52,8 @@ class EmailDatabase:
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.link(table='Contacts_Alias',
-                                             pk_1=contact_id,
-                                             pk_2=alias_id), (contact_id, alias_id))
+                                             col_name_1=contact_id,
+                                             col_name_2=alias_id), (contact_id, alias_id))
             conn.commit()
 
     def insert_email_address(self, email_address, return_existing_id=False):
@@ -73,8 +73,8 @@ class EmailDatabase:
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.link(table='Contacts_EmailAddresses',
-                                             pk_1=contact_id,
-                                             pk_2=address_id), (contact_id, address_id))
+                                             col_name_1=contact_id,
+                                             col_name_2=address_id), (contact_id, address_id))
             conn.commit()
 
     #--------------------------
@@ -109,8 +109,8 @@ class EmailDatabase:
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.link(table='Email_Date',
-                                             pk_1=email_id,
-                                             pk_2=date_id), (email_id, date_id))
+                                             col_name_1=email_id,
+                                             col_name_2=date_id), (email_id, date_id))
             conn.commit()
 
     # --------------------------
@@ -130,40 +130,64 @@ class EmailDatabase:
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.link(table='Email_Timestamp',
-                                             pk_1=email_id,
-                                             pk_2=timestamp_id), (email_id, timestamp_id))
+                                             col_name_1=email_id,
+                                             col_name_2=timestamp_id), (email_id, timestamp_id))
             conn.commit()
 
-    def link_from_email_address_id_to_email_id(self, email_id, email_address_id):
-        with sqlite3.connect(self.db_name) as conn:
-            c = conn.cursor()
-            c.execute(self.sql_requests.link(table='Email_From',
-                                             pk_1=email_id,
-                                             pk_2=email_address_id), (email_id, email_address_id))
-            conn.commit()
+    def link_from_email_address_id_to_email_id(self, email_id, email_address_ids):
+        # Todo debugging here
+        request = self.sql_requests.link(table='Email_From',
+                                         col_name_1='email_id',
+                                         col_name_2='email_address_id')
+        print(f"Executing query: {request}")  # Debugging line
+        print(f"With values: {email_id}, {email_address_ids}")
+        if isinstance(email_address_ids, (list, tuple, set)):
+            with sqlite3.connect(self.db_name) as conn:
+                c = conn.cursor()
+
+                #c.executemany(request, [(email_id, addr_id) for addr_id in email_address_ids])
+
+                for addr_id in email_address_ids:
+                    c.execute(f"INSERT OR IGNORE Email_From ('email_id', 'email_address_id') VALUES (?, ?)",
+                              (str(email_id), addr_id))
+                conn.commit()
+        else:
+            with sqlite3.connect(self.db_name) as conn:
+                c = conn.cursor()
+                c.execute(request, (email_id, email_address_ids))
+                conn.commit()
 
     def link_to_email_address_id_to_email_id(self, email_id, email_address_id):
-        with sqlite3.connect(self.db_name) as conn:
-            c = conn.cursor()
-            c.execute(self.sql_requests.link(table='Email_To',
-                                             pk_1=email_id,
-                                             pk_2=email_address_id), (email_id, email_address_id))
-            conn.commit()
+        if isinstance(email_address_id, (list, tuple, set)):
+            with sqlite3.connect(self.db_name) as conn:
+                c = conn.cursor()
+                request = self.sql_requests.link(table='Email_To',
+                                                 col_name_1='email_id',
+                                                 col_name_2='email_address_id')
+                c.executemany(request, [(email_id, addr_id) for addr_id in email_address_id])
+                conn.commit()
+        else:
+            with sqlite3.connect(self.db_name) as conn:
+                c = conn.cursor()
+                c.execute(self.sql_requests.link(table='Email_To',
+                                                 col_name_1=email_id,
+                                                 col_name_2=email_address_id), (email_id, email_address_id[0]))
+                conn.commit()
 
     def link_cc_email_address_id_to_email_id(self, email_id, email_address_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.link(table='Email_Cc',
-                                             pk_1=email_id,
-                                             pk_2=email_address_id), (email_id, email_address_id))
+                                             col_name_1=email_id,
+                                             col_name_2=email_address_id), (email_id, email_address_id))
             conn.commit()
 
     def link_bcc_email_address_id_to_email_id(self, email_id, email_address_id):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.link(table='Email_Bcc',
-                                             pk_1=email_id,
-                                             pk_2=email_address_id), (email_id, email_address_id))
+                                             col_name_1=email_id,
+                                             col_name_2=email_address_id), (email_id, email_address_id))
             conn.commit()
 
     def insert_attachment(self, id, filename, content, return_existing_id=False):
@@ -183,8 +207,8 @@ class EmailDatabase:
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.link(table='Email_Attachments',
-                                             pk_1=email_id,
-                                             pk_2=attachment_id), (email_id, attachment_id))
+                                             col_name_1=email_id,
+                                             col_name_2=attachment_id), (email_id, attachment_id))
             conn.commit()
 
 
