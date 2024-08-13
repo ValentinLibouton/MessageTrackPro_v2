@@ -14,7 +14,7 @@ class EmailDatabase:
             'contacts': {},  # {(first_name, last_name): id}
             'email_addresses': {},  # {address: id}
             'aliases': {},  # {alias: id}
-            'email_ids': set()  # set(id_1, id_2,...)
+            'email_ids': set()  # set(pk_1, pk_2,...)
         }
 
     def _create_tables(self):

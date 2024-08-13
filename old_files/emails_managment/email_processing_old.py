@@ -1,13 +1,10 @@
+from old_files.utils import *
 import email.utils
 from email.parser import BytesParser
 from email.policy import default
 import os
-import base64
-from bs4 import BeautifulSoup
-import quopri
-import re
-from email.utils import parseaddr, getaddresses
-import hashlib
+
+
 import time
 import pytz
 from datetime import datetime, timedelta
@@ -16,7 +13,6 @@ import mailbox
 from tqdm import tqdm
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from tabulate import tabulate
 
 
 def extract_name_and_email(fieldvalues: str):
@@ -34,7 +30,6 @@ def extract_name_and_email(fieldvalues: str):
     return name, address
 
 
-
 def extract_multiple_names_and_emails(fieldvalues):
     splited_filed = fieldvalues.split(',')
     extracted_list = []
@@ -43,6 +38,7 @@ def extract_multiple_names_and_emails(fieldvalues):
         d = {'name': name, 'email': email}
         extracted_list.append(d)
     return extracted_list
+
 
 def is_daylight_saving(date, timezone='Europe/Brussels'):
     tz = pytz.timezone(timezone)
@@ -53,13 +49,28 @@ def is_daylight_saving(date, timezone='Europe/Brussels'):
     is_dst = localized_date.dst() != timedelta(0)
     return is_dst
 
+def decode_content(part):
+    content_type = part.get_content_type()
+    content_disposition = part.get("Content-Disposition", None)
+
+    if content_type in ["text/plain", "text/html"] and (
+            content_disposition is None or "inline" in content_disposition):
+        payload = part.get_payload(decode=True)
+        charset = part.get_content_charset() or 'utf-8'  # Use the charset specified in the part, or default to 'utf-8'
+        try:
+            return payload.decode(charset, errors="replace")
+        except LookupError:
+            return payload.decode('utf-8', errors="replace")
+    return None
+
+
 def convert_date_to_datetime(date_str, target_tz="Europe/Brussels"):
     parsed_date = email.utils.parsedate(date_str)
     if parsed_date is None:
         return None
     date_obj = datetime(*parsed_date[:6])
 
-    if is_daylight_saving(date=date_obj): #for Europe/Brussels
+    if is_daylight_saving(date=date_obj):  #for Europe/Brussels
         season_offset = 2 * 3600
     else:
         season_offset = 1 * 3600
@@ -122,64 +133,6 @@ def split_names_and_emails(addresses, string_cleaning=True):
         emails.append(email)
     return names, emails
 
-def clean_string(s):
-    if s is None:
-        return None
-    exclude_char = ['<', '>', '\\', '/', '"', "'"]
-    return ''.join([char for char in s if char not in exclude_char])
-
-
-def hash_file(filepath):
-    sha256 = hashlib.sha256()
-    with open(filepath, 'rb') as f:
-        for block in iter(lambda: f.read(4096), b''):  # 4 KB chunks
-            sha256.update(block)
-    return sha256.hexdigest()
-
-def hash_message(data):
-    if isinstance(data, bytes):
-        msg_bytes = data
-    else:
-        msg_bytes = data.as_bytes()
-    sha256 = hashlib.sha256()
-    chunk_size = 8192  # 8 KB chunks
-    for i in range(0, len(msg_bytes), chunk_size):
-        sha256.update(msg_bytes[i:i + chunk_size])
-    return sha256.hexdigest()
-
-def decode_content(part):
-    content_type = part.get_content_type()
-    content_disposition = part.get("Content-Disposition", None)
-
-    if content_type in ["text/plain", "text/html"] and (
-            content_disposition is None or "inline" in content_disposition):
-        payload = part.get_payload(decode=True)
-        charset = part.get_content_charset() or 'utf-8'  # Use the charset specified in the part, or default to 'utf-8'
-        try:
-            return payload.decode(charset, errors="replace")
-        except LookupError:
-            return payload.decode('utf-8', errors="replace")
-    return None
-
-
-def has_multiple_at_signs(input_string):
-    """
-    Check if the input string contains more than one '@' character.
-
-    Parameters:
-    input_string (str): The string to be checked.
-
-    Returns:
-    bool: True if the string contains more than one '@' character, False otherwise.
-
-    Example:
-    >>> has_multiple_at_signs("test@example.com")
-    False
-    >>> has_multiple_at_signs("test@@example.com")
-    True
-    """
-    return input_string.count('@') > 1
-
 
 def store_email(data, filepath, with_attachments):
     if not data:
@@ -197,6 +150,7 @@ def store_email(data, filepath, with_attachments):
     # ----- END to facilitate DB insertions -----#
     id = hash_message(data=msg)
     attachments = []
+    attachments_set = set()
     body = ""
     if msg.is_multipart():
         for part in msg.walk():
@@ -226,27 +180,19 @@ def store_email(data, filepath, with_attachments):
     bcc_addresses = extract_multiple_names_and_emails(msg['bcc']) if msg['bcc'] else None
     bcc_names, bcc_emails = split_names_and_emails(bcc_addresses)
 
-    all_email_addresses.add(from_email)
-    all_email_addresses.update(to_emails)
-    all_email_addresses.update(cc_emails)
-    all_email_addresses.update(bcc_emails)
-    all_aliases.add(from_name)
-    all_aliases.update(to_names)
-    all_aliases.update(cc_names)
-    all_aliases.update(bcc_names)
-    id_email_linked_to_addresses_to.update([(id, to) for to in to_emails])
-    id_email_linked_to_addresses_cc.update([(id, cc) for cc in cc_emails])
-    id_email_linked_to_addresses_bcc.update([(id, bcc) for bcc in bcc_emails])
+    if from_email: all_email_addresses.add(from_email)
+    if to_emails: all_email_addresses.update(to_emails)
+    if cc_emails: all_email_addresses.update(cc_emails)
+    if bcc_emails: all_email_addresses.update(bcc_emails)
+    if from_name: all_aliases.add(from_name)
+    if to_names: all_aliases.update(to_names)
+    if cc_names: all_aliases.update(cc_names)
+    if bcc_names: all_aliases.update(bcc_names)
+    if to_emails: id_email_linked_to_addresses_to.update([(id, to) for to in to_emails])
+    if cc_emails: id_email_linked_to_addresses_cc.update([(id, cc) for cc in cc_emails])
+    if bcc_emails: id_email_linked_to_addresses_bcc.update([(id, bcc) for bcc in bcc_emails])
 
 
-    # Todo some tests ...
-    for txt, type in {'to': to_emails, 'cc': cc_emails, 'bcc': bcc_emails}.items():
-        if type:
-            for email in type:
-                if has_multiple_at_signs(email):
-                    print(email)
-                    raise ValueError(f"Trop d'adresses dans le champ {txt}:{email}")
-    # Todo end of tests
 
     date_obj = convert_date_to_datetime(msg['date'])
     date_iso8601 = date_obj.isoformat() if date_obj else None
@@ -258,7 +204,7 @@ def store_email(data, filepath, with_attachments):
         'from_email': from_email,
         'to_names': to_names,
         'to_emails': to_emails,
-        # 'cc': msg['cc'],# Todo test en cours
+        # 'cc': msg['cc'],# Todo tests en cours
         'cc_name': cc_names,
         'cc_emails': cc_emails,
         'bcc_names': bcc_names,
@@ -279,12 +225,13 @@ def store_email(data, filepath, with_attachments):
     }
     return data
 
+
 def process_file(file_type, filepath, with_attachments):
     email_list = []  # all datas list of dict
     if file_type == ".eml" or file_type == ".OUTLOOK.COM":
         data = store_email(None, filepath=filepath, with_attachments=with_attachments)
         email_list.append(data)  # all datas list of dict
-        
+
     elif file_type == ".mbox":
         try:
             mbox = mailbox.mbox(path=filepath)
@@ -296,6 +243,7 @@ def process_file(file_type, filepath, with_attachments):
     else:
         raise NotImplementedError
     return email_list
+
 
 class EmailProcessing:
     def __init__(self, path, with_attachments=False):
@@ -315,7 +263,7 @@ class EmailProcessing:
             'id_email_linked_to_addresses_bcc': set(),
             'id_email_linked_to_attachments_ids': set(),
             'emails': set(),
-            'attachments': set()}
+            'attachments': dict()}
 
         self.__time_dict = {}
         self.with_attachments = with_attachments
@@ -374,15 +322,17 @@ class EmailProcessing:
                         self.__aggregated_data['emails'].update((d['id'], d['filepath'], d['filename'],
                                                                  d['from_email'], d['subject'], d['date_obj'],
                                                                  d['date_iso8601'], d['body']))
-                        self.__aggregated_data['attachments'].update(d['attachments'])
+                        self.__aggregated_data['attachments'].update(attachment for attachment in d['attachments'])
                         self.__aggregated_data['all_email_addresses'].update(d['all_email_addresses'])
                         self.__aggregated_data['all_aliases'].update(d['all_aliases'])
-                        self.__aggregated_data['id_email_linked_to_addresses_to'].update(d['id_email_linked_to_addresses_to'])
+                        self.__aggregated_data['id_email_linked_to_addresses_to'].update(
+                            d['id_email_linked_to_addresses_to'])
                         self.__aggregated_data['id_email_linked_to_addresses_cc'].update(
                             d['id_email_linked_to_addresses_cc'])
                         self.__aggregated_data['id_email_linked_to_addresses_bcc'].update(
                             d['id_email_linked_to_addresses_bcc'])
-                        self.__aggregated_data['id_email_linked_to_attachments_ids'].update(d['id_email_linked_to_attachments_ids'])
+                        self.__aggregated_data['id_email_linked_to_attachments_ids'].update(
+                            d['id_email_linked_to_attachments_ids'])
 
                         if d['id'] not in self.__email_dict:
                             self.__email_dict[d['id']] = d
@@ -425,7 +375,6 @@ class EmailProcessing:
 
     def get_aggregated_data(self):
         return self.__aggregated_data
-
 
     @property
     def get_duplicates(self):
