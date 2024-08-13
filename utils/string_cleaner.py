@@ -2,71 +2,63 @@ from .istring_cleaner import IStringCleaner
 class StringCleaner(IStringCleaner):
     def __init__(self, exclude_chars=None):
         if exclude_chars is None:
-            exclude_chars = ['<', '>', '\\', '/', '"', "'"]
+            exclude_chars = ['<', '>', '\\', '/', '"', "'", ':', ';']
         self.exclude_chars = exclude_chars
 
-    def remove_chars(self, fieldvalue, exclude_chars=None):
+    def remove_chars(self, data, exclude_chars=None):
         if exclude_chars is None:
             exclude_chars = self.exclude_chars
-        if fieldvalue is None:
+        if data is None:
             return None
-        elif isinstance(fieldvalue, list):
-            return [self.remove_chars(element) for element in fieldvalue]
-        elif isinstance(fieldvalue, set):
-            return {self.remove_chars(element) for element in fieldvalue}
-        elif isinstance(fieldvalue, tuple):
-            return tuple(self.remove_chars(element) for element in fieldvalue)
-        elif isinstance(fieldvalue, str):
-            return ''.join([char for char in fieldvalue if char not in exclude_chars])
+        elif isinstance(data, list):
+            return [self.remove_chars(element) for element in data]
+        elif isinstance(data, set):
+            return {self.remove_chars(element) for element in data}
+        elif isinstance(data, tuple):
+            return tuple(self.remove_chars(element) for element in data)
+        elif isinstance(data, str):
+            return ''.join([char for char in data if char not in exclude_chars])
         else:
-            raise TypeError(f"Unsupported type: {type(fieldvalue)}")
+            raise TypeError(f"[remove_chars] Unsupported type: {type(data)}")
 
-    def split_name_address(self, fieldvalue: str) -> list:
-        if fieldvalue is None:
+    def contains_repeated_char(self, data, char: str):
+        if isinstance(data, str):
+            return data.count(char) > 1
+        elif isinstance(data, list):
+            return [self.contains_repeated_char(item, char) for item in data]
+        elif isinstance(data, tuple):
+            return tuple(self.contains_repeated_char(item, char) for item in data)
+        elif isinstance(data, set):
+            return {self.contains_repeated_char(item, char) for item in data}
+        else:
+            raise TypeError("[contains_repeated_char] Unsupported data type. Please provide a string, list, set, or tuple.")
+
+    def to_lower_and_strip(self, data):
+        if isinstance(data, str):
+            return data.lower().strip()
+        elif isinstance(data, list):
+            return [self.to_lower_and_strip(item) for item in data]
+        elif isinstance(data, set):
+            return {self.to_lower_and_strip(item) for item in data}
+        elif isinstance(data, tuple):
+            return tuple(self.to_lower_and_strip(item) for item in data)
+        elif isinstance(data, dict):
+            return {key: self.to_lower_and_strip(value) for key, value in data.items()}
+        else:
+            raise TypeError(f"[to_lower_and_strip] Unsupported type: {type(data)}")
+
+    def replace_chars_by_char(self, data, current_chars, new_char: str):
+        if data is None:
             return None
-        names_address = []
-        split_filed = fieldvalue.split(',')
-        for field in split_filed:
-            trimmed_field = self.to_lower_and_trim(string=field)
-            last_space_index = trimmed_field.rfind(' ')
-
-            if last_space_index == -1:
-                address = self.remove_chars(trimmed_field)
-                names_address.append(('', address))
-            else:
-                name = trimmed_field[:last_space_index]
-                address = trimmed_field[last_space_index+1:]
-                name = self.remove_chars(name)
-                address = self.remove_chars(address)
-                names_address.append((name, address))
-        return names_address
-
-
-    def separate_names_and_addresses_from_list(self, list_of_name_address_tuple: list) -> tuple:
-        """For e-mail address fields"""
-        if not list_of_name_address_tuple:
-            return [], []
-        names, addresses = zip(*list_of_name_address_tuple)
-        return list(names), list(addresses)
-
-    def contains_repeated_char(self, string: str, char: str) -> bool:
-        return string.count(char) > 1
-
-    def to_lower_and_trim(self, string: str) -> str:
-        return string.lower().strip()
-
-    def replace_chars_by_char(self, fieldvalue, current_chars, new_char: str):
-        if fieldvalue is None:
-            return None
-        elif isinstance(fieldvalue, list):
-            return [self.replace_chars_by_char(element, current_chars, new_char) for element in fieldvalue]
-        elif isinstance(fieldvalue, set):
-            return {self.replace_chars_by_char(element, current_chars, new_char) for element in fieldvalue}
-        elif isinstance(fieldvalue, tuple):
-            return tuple(self.replace_chars_by_char(element, current_chars, new_char) for element in fieldvalue)
-        elif isinstance(fieldvalue, str):
+        elif isinstance(data, list):
+            return [self.replace_chars_by_char(element, current_chars, new_char) for element in data]
+        elif isinstance(data, set):
+            return {self.replace_chars_by_char(element, current_chars, new_char) for element in data}
+        elif isinstance(data, tuple):
+            return tuple(self.replace_chars_by_char(element, current_chars, new_char) for element in data)
+        elif isinstance(data, str):
             for char in current_chars:
-                fieldvalue = fieldvalue.replace(char, new_char)
-            return fieldvalue
+                data = data.replace(char, new_char)
+            return data
         else:
-            raise TypeError(f"Unsupported type: {type(fieldvalue)}")
+            raise TypeError(f"[replace_chars_by_char] Unsupported type: {type(data)}")

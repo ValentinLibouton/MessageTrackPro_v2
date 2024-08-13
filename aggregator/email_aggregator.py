@@ -27,13 +27,41 @@ class EmailAggregator:
         self.process_email_files(mbox_list)
 
     def add_email(self, file_path, email):
-        email_id = self._db.insert_email(id=email['email_id'], filepath=file_path, filename=os.path.basename(file_path), subject=email['subject'], body=email['body'])
+        email_id = self._db.insert_email(id=email['email_id'],
+                                         filepath=file_path,
+                                         filename=os.path.basename(file_path),
+                                         subject=email['subject'],
+                                         body=email['body'])
+
         for names in [email['from_name'], email['to_names'], email['cc_names'], email['bcc_names']]:
             [self._db.insert_alias(alias=name) for name in names]
 
-        id_from = [self._db.insert_email_address(email_address=address, return_existing_id=True) for address in email['from_address']]
-        print(f"id_from: {id_from}")
-        self._db.link_from_email_address_id_to_email_id(email_id, email_address_ids=id_from)
+        id_from = [self._db.insert_email_address(email_address=address,
+                                                 return_existing_id=True) for address in email['from_address']]
+        self._db.link(table='Email_From', col_name_1='email_id', col_name_2='email_address_id',
+                      value_1=email_id, value_2=id_from)
+
+        id_to = [self._db.insert_email_address(email_address=address,
+                                               return_existing_id=True) for address in email['to_addresses']]
+        self._db.link(table='Email_To', col_name_1='email_id', col_name_2='email_address_id',
+                      value_1=email_id, value_2=id_to)
+
+        id_cc = [self._db.insert_email_address(email_address=address,
+                                               return_existing_id=True) for address in email['cc_addresses']]
+        self._db.link(table='Email_Cc', col_name_1='email_id', col_name_2='email_address_id',
+                      value_1=email_id, value_2=id_cc)
+
+        id_bcc = [self._db.insert_email_address(email_address=address,
+                                               return_existing_id=True) for address in email['bcc_addresses']]
+        self._db.link(table='Email_Bcc', col_name_1='email_id', col_name_2='email_address_id',
+                      value_1=email_id, value_2=id_bcc)
+
+        date_str_id = self._db.insert(table='Date', col_names=['date'], values=email['date_str'],
+                                      return_existing_id=True)
+        self._db.link(table='Email_Date', col_name_1='email_id', col_name_2='date_id',
+                      value_1=email_id, value_2=date_str_id)
+
+
 
 
 

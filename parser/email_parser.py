@@ -105,9 +105,9 @@ class EmailParser(IEmailParser):
         return body, attachments
 
     def _parse_names_addresses(self, data):
-        list_names_and_addresses = self.sc.split_name_address(fieldvalue=data)
-        names, addresses = self.sc.separate_names_and_addresses_from_list(list_names_and_addresses)
-        names = self.sc.replace_chars_by_char(fieldvalue=names, current_chars={'.'}, new_char=' ')
+        list_names_and_addresses = self.split_name_address(fieldvalue=data)
+        names, addresses = self.separate_names_and_addresses_from_list(list_names_and_addresses)
+        names = self.sc.replace_chars_by_char(data=names, current_chars={'.'}, new_char=' ')
         return names, addresses
 
 
@@ -116,4 +116,53 @@ class EmailParser(IEmailParser):
         date_obj = self.dt.change_time_shift(date_input=date_obj)
         return date_obj
 
+    def split_name_address(self, fieldvalue: str) -> list:
+        """
+        Some names contain one or more commas, which should not be mistaken for a splitting character.
+        Avoid cutting names with commas.
 
+        Sometimes a name is the e-mail address, so the person field will contain the address twice,
+        and therefore twice '@'.
+        """
+        if fieldvalue is None:
+            return None
+        if not isinstance(fieldvalue, str):
+            raise TypeError("A string is expected for the 'fieldvalue' argument to the 'split_name_address' method.")
+        split_field = []
+        field = ''
+        for char in fieldvalue:
+            field += char
+            if char == ',' and 2 >= field.count('@') >= 1:
+                field = self.sc.to_lower_and_strip(data=field)
+                split_field.append(field[:-1])
+                field = ''
+        if split_field == []:
+            split_field.append(fieldvalue)
+
+        names_address = []
+        # split_field = fieldvalue.split(',')
+        for field in split_field:
+            # print(f"Address field: {field}")
+            last_space_index = field.rfind(' ')
+
+            if last_space_index == -1:
+                address = self.sc.remove_chars(field)
+                names_address.append(('', address))
+            else:
+                name = field[:last_space_index]
+                address = field[last_space_index+1:]
+                name = self.sc.remove_chars(name)
+                address = self.sc.remove_chars(address)
+                if name == address:
+                    names_address.append(('', address))
+                else:
+                    names_address.append((name, address))
+        return names_address
+
+
+    def separate_names_and_addresses_from_list(self, list_of_name_address_tuple: list) -> tuple:
+        """For e-mail address fields"""
+        if not list_of_name_address_tuple:
+            return [], []
+        names, addresses = zip(*list_of_name_address_tuple)
+        return list(names), list(addresses)

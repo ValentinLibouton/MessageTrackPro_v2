@@ -6,19 +6,11 @@ class IStringCleaner(ABC):
         pass
 
     @abstractmethod
-    def split_name_address(self, fieldvalue: str) -> list:
+    def contains_repeated_char(self, data, char: str):
         pass
 
     @abstractmethod
-    def separate_names_and_addresses_from_list(self, list_of_name_address_tuple: list) -> tuple:
-        pass
-
-    @abstractmethod
-    def contains_repeated_char(self, string: str, char: str) -> bool:
-        pass
-
-    @abstractmethod
-    def to_lower_and_trim(self, string: str) -> str:
+    def to_lower_and_strip(self, data):
         pass
 
     @abstractmethod
