@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS Emails (
     body TEXT
 );
 
+-- Putting dates in a specific table will make it easier to aggregate all types of data:
+-- (e-mail, sms, mms, calls, FB messenger, etc.).
 CREATE TABLE IF NOT EXISTS Date(
     id INTEGER PRIMARY KEY,
     date TEXT UNIQUE
@@ -48,6 +50,8 @@ CREATE TABLE IF NOT EXISTS Email_Date(
     FOREIGN KEY(date_id) REFERENCES Date(id)
 );
 
+-- Putting timestamps in a specific table will make it easier to aggregate all types of data:
+-- (e-mail, sms, mms, calls, FB messenger, etc.).
 CREATE TABLE IF NOT EXISTS Timestamp(
     id INTEGER PRIMARY KEY,
     timestamp REAL UNIQUE
@@ -55,7 +59,7 @@ CREATE TABLE IF NOT EXISTS Timestamp(
 
 CREATE TABLE IF NOT EXISTS Email_Timestamp(
     email_id TEXT,
-    timestamp_id REAL,
+    timestamp_id INTEGER,
     FOREIGN KEY(email_id) REFERENCES Emails(id),
     FOREIGN KEY(timestamp_id) REFERENCES Timestamp(id)
 );
