@@ -18,7 +18,6 @@ class EmailAggregator:
         self._db = email_database
         self.retrieve_and_aggregate_emails()
 
-
     def retrieve_and_aggregate_emails(self):
         self._file_retriever.retrieve_files_path()
         email_list = self._file_retriever.filepath_dict.get('emails', [])
@@ -52,26 +51,29 @@ class EmailAggregator:
                       value_1=email_id, value_2=id_cc)
 
         id_bcc = [self._db.insert_email_address(email_address=address,
-                                               return_existing_id=True) for address in email['bcc_addresses']]
+                                                return_existing_id=True) for address in email['bcc_addresses']]
         self._db.link(table='Email_Bcc', col_name_1='email_id', col_name_2='email_address_id',
                       value_1=email_id, value_2=id_bcc)
 
-        date_str_id = self._db.insert(table='Date', col_names=['date'], values=email['date_str'],
-                                      return_existing_id=True)
+        date_str_id = self._db.insert_date(date=email['date_str'], return_existing_id=True)
         self._db.link(table='Email_Date', col_name_1='email_id', col_name_2='date_id',
                       value_1=email_id, value_2=date_str_id)
 
+        timestamp_id = self._db.insert_timestamp(timestamp=email['timestamp'], return_existing_id=True)
+        self._db.link(table='Email_Timestamp', col_name_1='email_id', col_name_2='timestamp_id',
+                      value_1=email_id, value_2=timestamp_id)
 
-
-
-
+        for attachment in email['attachments']:
+            attachment_id = attachment['attachment_id']
+            self._db.insert_attachment(id=attachment_id, filename=attachment['filename'], content=attachment['content'])
+            self._db.link(table='Email_Attachments', col_name_1='email_id', col_name_2='attachment_id',
+                          value_1=email_id, value_2=attachment_id)
 
     def add_emails(self, emails):
         with ProcessPoolExecutor() as executor:
             futures = [executor.submit(self.add_email, email) for email in emails]
             for future in tqdm(as_completed(futures), total=len(futures), desc="Emails aggregation"):
                 future.result()
-
 
     def process_email_files(self, email_files):
         total_files = len(email_files)
@@ -90,7 +92,8 @@ class EmailAggregator:
             emails = []
             with ProcessPoolExecutor() as executor:
                 futures = [executor.submit(self.process_mbox_file, message, file_path) for message in mbox]
-                with tqdm(total=len(futures), desc=f"Processing mbox: {file_path}", file=sys.stdout, leave=True) as pbar:
+                with tqdm(total=len(futures), desc=f"Processing mbox: {file_path}", file=sys.stdout,
+                          leave=True) as pbar:
                     for future in as_completed(futures):
                         emails.append(future.result())
                         pbar.update(1)
@@ -99,7 +102,7 @@ class EmailAggregator:
     def process_email_file(self, file_path):
         with open(file_path, 'rb') as f:
             email_content = f.read()
-            #print(f"Fichier: {file_path}")
+            # print(f"Fichier: {file_path}")
             email = self._ep.parse_email(email_content=email_content)
             return file_path, email
 
