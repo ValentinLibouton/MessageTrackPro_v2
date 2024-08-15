@@ -64,7 +64,7 @@ class SQLRequest:
         return request
 
     @staticmethod
-    def any_word_search(table, columns, words):
+    def any_word_search(table, columns, words, ids=None):
         """
         Generates an SQL query that selects the primary key from a specified table
         where any of the given words must appear in at least one of the specified columns.
@@ -92,7 +92,13 @@ class SQLRequest:
             word_conditions.append(f"({column_conditions})")
 
         request += " OR ".join(word_conditions)
+
+        if ids:
+            id_conditions = ", ".join([id for id in ids])
+            request += f" AND id IN ({id_conditions})"
         return request
+
+
 
 def list_static_methods(cls):
     import inspect
