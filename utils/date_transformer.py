@@ -161,3 +161,11 @@ class DateTransformer(IDateTransformer):
                 date_input = date_input + timedelta(seconds=offset + season_offset)
 
         return date_input.astimezone(pytz.timezone(self.timezone_name))
+
+    def convert_to_timestamp(self, date_string: str) -> int:
+        dt = datetime.strptime(date_string, '%Y-%m-%d %H:%M:%S')
+
+        # Convertir l'objet datetime en timestamp
+        timestamp = int(dt.timestamp())
+
+        return timestamp
