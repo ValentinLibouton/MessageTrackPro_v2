@@ -84,11 +84,40 @@ class DatabaseRetriever:
     def join(self):
         if 'everywhere' in self.params.get('words_localization', []):
             self.add_join("JOIN Email_From ef ON e.id = ef.email_id")
+            self.add_join("JOIN Email_To ef ON e.id = et.email_id")
+            self.add_join("JOIN Email_Cc ec ON e.id = ec.email_id")
+            self.add_join("JOIN Email_Bcc eb ON e.id = eb.email_id")
+
             self.add_join("JOIN EmailAddresses ea1 ON ea1.id = ef.email_address_id")
+            self.add_join("JOIN EmailAddresses ea2 ON ea2.id = et.email_address_id")
+            self.add_join("JOIN EmailAddresses ea3 ON ea3.id = ec.email_address_id")
+            self.add_join("JOIN EmailAddresses ea4 ON ea4.id = eb.email_address_id")
+
             self.add_join("JOIN Contacts_EmailAddresses cea1 ON ea1.id = cea1.email_address_id")
-            self.add_join("JOIN Contacts_Alias ca ON cea1.contact_id = ca.contact_id")
-            self.add_join("JOIN Contacts c ON ca.contact_id = c.id")
-            self.add_join("JOIN Contacts c2 ON cea1.contact_id = c2.id")
+            self.add_join("JOIN Contacts_EmailAddresses cea2 ON ea2.id = cea2.email_address_id")
+            self.add_join("JOIN Contacts_EmailAddresses cea3 ON ea3.id = cea3.email_address_id")
+            self.add_join("JOIN Contacts_EmailAddresses cea4 ON ea4.id = cea4.email_address_id")
+
+            self.add_join("JOIN Contacts_Alias ca1 ON cea1.contact_id = ca1.contact_id")
+            self.add_join("JOIN Contacts_Alias ca2 ON cea2.contact_id = ca2.contact_id")
+            self.add_join("JOIN Contacts_Alias ca3 ON cea3.contact_id = ca3.contact_id")
+            self.add_join("JOIN Contacts_Alias ca4 ON cea4.contact_id = ca4.contact_id")
+
+            self.add_join("JOIN Alias a1 ON ca1.alias_id = a1.id")
+            self.add_join("JOIN Alias a2 ON ca2.alias_id = a2.id")
+            self.add_join("JOIN Alias a3 ON ca3.alias_id = a3.id")
+            self.add_join("JOIN Alias a4 ON ca4.alias_id = a4.id")
+
+            self.add_join("JOIN Contacts c1 ON ca1.contact_id = c1.id")
+            self.add_join("JOIN Contacts c2 ON ca2.contact_id = c2.id")
+            self.add_join("JOIN Contacts c3 ON ca3.contact_id = c3.id")
+            self.add_join("JOIN Contacts c4 ON ca4.contact_id = c4.id")
+
+
+            self.add_join("JOIN Contacts c5 ON cea1.contact_id = c5.id")
+            self.add_join("JOIN Contacts c6 ON cea2.contact_id = c6.id")
+            self.add_join("JOIN Contacts c7 ON cea3.contact_id = c7.id")
+            self.add_join("JOIN Contacts c8 ON cea4.contact_id = c8.id")
 
             #self.add_join("JOIN Email_Date ed ON e.id = ed.email_id")
             #self.add_join("JOIN Date d ON ed.date_id = d.id")
@@ -100,17 +129,32 @@ class DatabaseRetriever:
 
         if self.params.get('contacts') or 'contact' in self.params.get('words_localization', []):
             self.add_join("JOIN Email_From ef ON e.id = ef.email_id")
-            self.add_join("JOIN EmailAddresses ea1 ON ea1.id = ef.email_address_id")
-            self.add_join("JOIN Contacts_EmailAddresses cea1 ON ea1.id = cea1.email_address_id")
-            self.add_join("JOIN Contacts_Alias ca ON cea1.contact_id = ca.contact_id")
-            self.add_join("JOIN Contacts c ON ca.contact_id = c.id")
-            self.add_join("JOIN Contacts c2 ON cea1.contact_id = c2.id")
+            self.add_join("JOIN Email_To ef ON e.id = et.email_id")
+            self.add_join("JOIN Email_Cc ec ON e.id = ec.email_id")
+            self.add_join("JOIN Email_Bcc eb ON e.id = eb.email_id")
 
+            self.add_join("JOIN EmailAddresses ea1 ON ea1.id = ef.email_address_id")
+            self.add_join("JOIN EmailAddresses ea2 ON ea2.id = et.email_address_id")
+            self.add_join("JOIN EmailAddresses ea3 ON ea3.id = ec.email_address_id")
+            self.add_join("JOIN EmailAddresses ea4 ON ea4.id = eb.email_address_id")
+
+            self.add_join("JOIN Contacts_EmailAddresses cea1 ON ea1.id = cea1.email_address_id")
+            self.add_join("JOIN Contacts_EmailAddresses cea2 ON ea2.id = cea2.email_address_id")
+            self.add_join("JOIN Contacts_EmailAddresses cea3 ON ea3.id = cea3.email_address_id")
+            self.add_join("JOIN Contacts_EmailAddresses cea4 ON ea4.id = cea4.email_address_id")
+
+            self.add_join("JOIN Contacts c5 ON cea1.contact_id = c5.id")
+            self.add_join("JOIN Contacts c6 ON cea2.contact_id = c6.id")
+            self.add_join("JOIN Contacts c7 ON cea3.contact_id = c7.id")
+            self.add_join("JOIN Contacts c8 ON cea4.contact_id = c8.id")
+
+            # Todo: j'ai modifié ci-dessus, je dois encore modifier ci-dessous
         if self.params.get('aliases') or 'alias' in self.params.get('words_localization', []):
             self.add_join("JOIN Email_From ef ON e.id = ef.email_id")
             self.add_join("JOIN EmailAddresses ea1 ON ea1.id = ef.email_address_id")
             self.add_join("JOIN Contacts_EmailAddresses cea1 ON ea1.id = cea1.email_address_id")
             self.add_join("JOIN Contacts_Alias ca ON cea1.contact_id = ca.contact_id")
+            self.add_join("JOIN Alias a ON ca.alias_id = a.id")
 
         if self.params.get('addresses') or 'address' in self.params.get('words_localization', []):
             self.add_join("JOIN Email_From ef ON e.id = ef.email_id")
@@ -138,15 +182,22 @@ class DatabaseRetriever:
             self.add_where(f"ts.timestamp <= '{self.end_timestamp}'")
 
         if self.params.get('contacts'):
-            contact_conditions = " OR ".join([
-                f"LOWER(c.first_name) = LOWER({first_name}) AND LOWER(c.last_name) = LOWER({last_name})"
-                for first_name, last_name in self.params['contacts']
-            ])
+            contact_conditions = " OR ".join(
+                [f"LOWER(c.first_name) = LOWER({first_name}) AND LOWER(c.last_name) = LOWER({last_name})"
+                for first_name, last_name in self.params['contacts']])
             self.add_where(f"({contact_conditions})")
 
         if self.params.get('aliases'):
-            alias_conditions = " OR ".join([f"LOWER(a.alias) = LOWER('{alias}')" for alias in self.params['aliases']])
+            alias_conditions = " OR ".join(
+                [f"LOWER(a.alias) = LOWER('{alias}')" for alias in self.params['aliases']])
             self.add_where(f"({alias_conditions})")
+
+        if self.params.get('addresses'):
+            address_conditions = " OR ".join(
+                [f"LOWER(ea1.address) = LOWER('{address}" for address in self.params['addresses']]
+            )
+
+
 
         # ToDo: below....
         if 'contact' in self.params.get('words_localization', []):
