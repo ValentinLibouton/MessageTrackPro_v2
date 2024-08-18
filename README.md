@@ -31,4 +31,8 @@ _____________________________________________________________________
 
 _____________________________________________________________________
 # Docs
-![Table view](images/SQL_Tables.png)
+## Tables
+![Table](images/Tables.png)
+
+## Join
+![Table](images/Joins.png)

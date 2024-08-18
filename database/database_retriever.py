@@ -93,7 +93,6 @@ class DatabaseRetriever:
             self._join_email_addresses()
             self._join_contacts()
 
-            # Todo: j'ai modifié ci-dessus, je dois encore modifier ci-dessous
         if self.params.get('aliases') or 'alias' in self.params.get('words_localization', []):
             self._join_email_addresses()
             self._join_contacts()
@@ -126,29 +125,22 @@ class DatabaseRetriever:
         self.add_join("JOIN Contacts_EmailAddresses cea3 ON ea3.id = cea3.email_address_id")
         self.add_join("JOIN Contacts_EmailAddresses cea4 ON ea4.id = cea4.email_address_id")
 
-        self.add_join("JOIN Contacts c5 ON cea1.contact_id = c5.id")
-        self.add_join("JOIN Contacts c6 ON cea2.contact_id = c6.id")
-        self.add_join("JOIN Contacts c7 ON cea3.contact_id = c7.id")
-        self.add_join("JOIN Contacts c8 ON cea4.contact_id = c8.id")
+        self.add_join("JOIN Contacts c1 ON cea1.contact_id = c1.id")
+        self.add_join("JOIN Contacts c2 ON cea2.contact_id = c2.id")
+        self.add_join("JOIN Contacts c3 ON cea3.contact_id = c3.id")
+        self.add_join("JOIN Contacts c4 ON cea4.contact_id = c4.id")
 
     def _join_aliases(self):
-        #Todo need to check
-        """
-        self.add_join("JOIN Contacts_Alias ca1 ON cea1.contact_id = ca1.contact_id")
-        self.add_join("JOIN Contacts_Alias ca2 ON cea2.contact_id = ca2.contact_id")
-        self.add_join("JOIN Contacts_Alias ca3 ON cea3.contact_id = ca3.contact_id")
-        self.add_join("JOIN Contacts_Alias ca4 ON cea4.contact_id = ca4.contact_id")
-
-        self.add_join("JOIN Contacts c1 ON ca1.contact_id = c1.id")
-        self.add_join("JOIN Contacts c2 ON ca2.contact_id = c2.id")
-        self.add_join("JOIN Contacts c3 ON ca3.contact_id = c3.id")
-        self.add_join("JOIN Contacts c4 ON ca4.contact_id = c4.id")
+        self.add_join("JOIN Contacts_Alias ca1 ON c1.id = ca1.contact_id")
+        self.add_join("JOIN Contacts_Alias ca2 ON c2.contact_id = ca2.contact_id")
+        self.add_join("JOIN Contacts_Alias ca3 ON c3.contact_id = ca3.contact_id")
+        self.add_join("JOIN Contacts_Alias ca4 ON c4.contact_id = ca4.contact_id")
 
         self.add_join("JOIN Alias a1 ON ca1.alias_id = a1.id")
         self.add_join("JOIN Alias a2 ON ca2.alias_id = a2.id")
         self.add_join("JOIN Alias a3 ON ca3.alias_id = a3.id")
-        self.add_join("JOIN Alias a4 ON ca4.alias_id = a4.id")"""
-        pass
+        self.add_join("JOIN Alias a4 ON ca4.alias_id = a4.id")
+
     def _join_dates(self):
         #self.add_join("JOIN Email_Date ed ON e.id = ed.email_id")
         #self.add_join("JOIN Date d ON ed.date_id = d.id")
