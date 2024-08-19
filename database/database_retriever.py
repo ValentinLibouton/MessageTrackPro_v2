@@ -9,8 +9,10 @@ class DatabaseRetriever:
         : addresses: filtering on specific email addresses
         : start_date: filtering on start date
         : end_date: filtering on end date
+        : words: list of words to find
         :words_localization: list of words localization ['everywhere', 'contact', 'alias', 'address',
                                 'subject', 'body', 'attachment_name', 'attachment']
+        :word_operator: "AND" or "OR"
         :attachment_types: filtering on attachment types
 
         """
@@ -18,8 +20,9 @@ class DatabaseRetriever:
 
         self.db_name = db_name
         self.params = kwargs
+        self.valid_localization = ['everywhere', 'contact', 'alias', 'address', 'subject', 'body', 'attachment_name', 'attachment']
         self.words_localization_control()
-        self.convert_to_timestamp()
+        self.date_to_timestamp()
 
         self.join_clauses = set()
         self.where_clauses = set()
@@ -28,28 +31,22 @@ class DatabaseRetriever:
         self.request = ""
 
     def words_localization_control(self):
-        valid_localization = ['everywhere', 'contact', 'alias', 'address', 'subject', 'body', 'attachment_name', 'attachment']
         words_localization = self.params.get('words_localization', [])
         if 'everywhere' in words_localization:
             self.params['words_localization'] = ['everywhere']
         else:
             for localization in words_localization:
-                if localization not in valid_localization[1:]: # everywhere already processed
-                    raise ValueError(f"{localization} is not a valid words localization, valid values are: {valid_localization}")
+                if localization not in self.valid_localization[1:]: # everywhere already processed
+                    raise ValueError(f"{localization} is not a valid words localization, valid values are: {self.valid_localization}")
+        self.word_operator = self.params.get('word_operator', 'OR')
 
     def date_to_timestamp(self):
         dt = DateTransformer()
-        if self.params['start_date']:
-            self.start_timestamp = dt.convert_to_timestamp(self.params['start_date'])
-        else:
-            self.start_timestamp = 0
-        if self.params['end_date']:
-            self.end_timestamp = dt.convert_to_timestamp(self.params['end_date'])
-        else:
-            self.end_timestamp = None
+        self.start_timestamp = dt.convert_to_timestamp(self.params['start_date']) if self.params.get('start_date') else 0
+        self.end_timestamp = dt.convert_to_timestamp(self.params['end_date']) if self.params.get('end_date') else None
 
     def select(self):
-        self.request = f"""SELECT e.id FROM Emails e"""
+        self.request = f"""SELECT DISTINCT e.id FROM Emails e"""
         return self
 
     def add_join(self, join_clause):
@@ -70,40 +67,45 @@ class DatabaseRetriever:
         return self
 
     def build_query(self):
-        query = self.select()
+        self.select()
         if self.join_clauses:
-            query += " " + " ".join(self.join_clauses)
+            self.request += " " + " ".join(self.join_clauses)
         if self.where_clauses:
-            query += " WHERE " + " AND ".join(self.where_clauses)
+            self.request += " WHERE " + f" {self.word_operator} ".join(self.where_clauses)
         if self.order_by_clause:
-            query += " " + self.order_by_clause
+            self.request += " " + self.order_by_clause
         if self.limit_clause:
-            query += " " + self.limit_clause
-        return query
+            self.request += " " + self.limit_clause
+        return self.request
 
     def join(self):
-        if 'everywhere' in self.params.get('words_localization', []):
+        if 'everywhere' in self.params.get('words_localization', []) and self.params.get('words', []):
             self._join_email_addresses()
             self._join_contacts()
             self._join_aliases()
             self._join_dates()
             self._join_attachments()
 
-        if self.params.get('contacts') or 'contact' in self.params.get('words_localization', []):
+        if (self.params.get('contacts')
+                or ('contact' in self.params.get('words_localization', []) and self.params.get('words', []))):
             self._join_email_addresses()
             self._join_contacts()
 
-        if self.params.get('aliases') or 'alias' in self.params.get('words_localization', []):
+        if (self.params.get('aliases')
+                or ('alias' in self.params.get('words_localization', []) and self.params.get('words', []))):
             self._join_email_addresses()
             self._join_contacts()
 
-        if self.params.get('addresses') or 'address' in self.params.get('words_localization', []):
+        if (self.params.get('addresses')
+                or ('address' in self.params.get('words_localization', []) and self.params.get('words', []))):
             self._join_email_addresses()
 
         if self.params.get('start_date') or self.params.get('end_date'):
             self._join_dates()
 
-        if self.params.get('attachment_types') or 'attachment' in self.params.get('words_localization', []) or 'attachment_name' in self.params.get('words_localization', []):
+        if (self.params.get('attachment_types')
+                or ('attachment' in self.params.get('words_localization', []) and self.params.get('words', []))
+                or ('attachment_name' in self.params.get('words_localization', []) and self.params.get('words', []))):
             self._join_attachments()
 
         return self
@@ -114,32 +116,19 @@ class DatabaseRetriever:
         self.add_join("JOIN Email_Cc ec ON e.id = ec.email_id")
         self.add_join("JOIN Email_Bcc eb ON e.id = eb.email_id")
 
-        self.add_join("JOIN EmailAddresses ea1 ON ea1.id = ef.email_address_id")
-        self.add_join("JOIN EmailAddresses ea2 ON ea2.id = et.email_address_id")
-        self.add_join("JOIN EmailAddresses ea3 ON ea3.id = ec.email_address_id")
-        self.add_join("JOIN EmailAddresses ea4 ON ea4.id = eb.email_address_id")
+        # self.add_join("JOIN EmailAddresses ea1 ON ea1.id = ef.email_address_id")
+        # self.add_join("JOIN EmailAddresses ea2 ON ea2.id = et.email_address_id")
+        # self.add_join("JOIN EmailAddresses ea3 ON ea3.id = ec.email_address_id")
+        # self.add_join("JOIN EmailAddresses ea4 ON ea4.id = eb.email_address_id")
+        self.add_join("JOIN EmailAddresses ea ON ea.id IN (ef.email_address_id, et.email_address_id, ec.email_address_id, eb.email_address_id)")
 
     def _join_contacts(self):
-        self.add_join("JOIN Contacts_EmailAddresses cea1 ON ea1.id = cea1.email_address_id")
-        self.add_join("JOIN Contacts_EmailAddresses cea2 ON ea2.id = cea2.email_address_id")
-        self.add_join("JOIN Contacts_EmailAddresses cea3 ON ea3.id = cea3.email_address_id")
-        self.add_join("JOIN Contacts_EmailAddresses cea4 ON ea4.id = cea4.email_address_id")
-
-        self.add_join("JOIN Contacts c1 ON cea1.contact_id = c1.id")
-        self.add_join("JOIN Contacts c2 ON cea2.contact_id = c2.id")
-        self.add_join("JOIN Contacts c3 ON cea3.contact_id = c3.id")
-        self.add_join("JOIN Contacts c4 ON cea4.contact_id = c4.id")
+        [self.add_join(f"JOIN Contacts_EmailAddresses cea{i} ON ea{i}.id = cea{i}.email_address_id") for i in range(1, 5)]
+        [self.add_join(f"JOIN Contacts c{i} ON cea{i}.contact_id = c{i}.id") for i in range(1, 5)]
 
     def _join_aliases(self):
-        self.add_join("JOIN Contacts_Alias ca1 ON c1.id = ca1.contact_id")
-        self.add_join("JOIN Contacts_Alias ca2 ON c2.contact_id = ca2.contact_id")
-        self.add_join("JOIN Contacts_Alias ca3 ON c3.contact_id = ca3.contact_id")
-        self.add_join("JOIN Contacts_Alias ca4 ON c4.contact_id = ca4.contact_id")
-
-        self.add_join("JOIN Alias a1 ON ca1.alias_id = a1.id")
-        self.add_join("JOIN Alias a2 ON ca2.alias_id = a2.id")
-        self.add_join("JOIN Alias a3 ON ca3.alias_id = a3.id")
-        self.add_join("JOIN Alias a4 ON ca4.alias_id = a4.id")
+        [self.add_join(f"JOIN Contacts_Alias ca{i} ON c{i}.id = ca{i}.contact_id") for i in range(1, 5)]
+        [self.add_join(f"JOIN Alias a{i} ON ca{i}.alias_id = a{i}.id") for i in range(1, 5)]
 
     def _join_dates(self):
         #self.add_join("JOIN Email_Date ed ON e.id = ed.email_id")
@@ -149,9 +138,19 @@ class DatabaseRetriever:
 
     def _join_attachments(self):
         self.add_join("JOIN Email_Attachments ea ON e.id = ea.email_id")
-        self.add_join("JOIN Attachments att ON ea.attachment_id = att.id")
+        self.add_join("JOIN Attachments a ON ea.attachment_id = a.id")
 
     def where(self):
+        self._where_date()
+        self._where_contacts()
+        self._where_aliases()
+        self._where_addresses()
+        self._where_attachments_types()
+        self._where_words()
+        return self
+
+
+    def _where_date(self):
         if self.params.get('start_date') and self.params.get('end_date'):
             self.add_where(f"ts.timestamp BETWEEN '{self.start_timestamp}' AND '{self.end_timestamp}'")
         elif self.params.get('start_date'):
@@ -159,93 +158,86 @@ class DatabaseRetriever:
         elif self.params.get('end_date'):
             self.add_where(f"ts.timestamp <= '{self.end_timestamp}'")
 
+    def _where_contacts(self):
         if self.params.get('contacts'):
             contact_conditions = " OR ".join(
-                [f"LOWER(c.first_name) = LOWER({first_name}) AND LOWER(c.last_name) = LOWER({last_name})"
-                for first_name, last_name in self.params['contacts']])
+                [f"LOWER(c{i}.first_name) = LOWER({first_name}) AND LOWER(c{i}.last_name) = LOWER({last_name})"
+                for first_name, last_name in self.params['contacts'] for i in range(1,5)])
             self.add_where(f"({contact_conditions})")
 
+    def _where_aliases(self):
         if self.params.get('aliases'):
             alias_conditions = " OR ".join(
-                [f"LOWER(a.alias) = LOWER('{alias}')" for alias in self.params['aliases']])
+                [f"LOWER(a{i}.alias) = LOWER('{alias}')" for alias in self.params['aliases'] for i in range(1, 5)])
             self.add_where(f"({alias_conditions})")
 
+    def _where_addresses(self):
         if self.params.get('addresses'):
             address_conditions = " OR ".join(
-                [f"LOWER(ea1.address) = LOWER('{address}" for address in self.params['addresses']]
+                [f"LOWER(ea{i}.address) = LOWER('{address}" for address in self.params['addresses'] for i in range(1, 5)])
+            self.add_where(f"({address_conditions})")
+
+    def _where_attachments_types(self):
+        if self.params.get('attachments_type'):
+            attachment_conditions = " OR ".join(
+                [f"LOWER(a.filename) LIKE '%.{file_type.lower()}'" for file_type in self.params['attachment_types']]
             )
+            self.add_where(f"({attachment_conditions})")
 
+    def _where_words(self):
+        if self.params.get('words'):
+            word_conditions = []
+            added_conditions = set()
+            if "everywhere" in self.params.get('words_localization', []):
+                localizations = self.valid_localization[1:]
+            else:
+                localizations = self.params.get('words_localization', [])
 
+            for word in self.params['words']:
+                word = word.lower()
+                conditions = []
 
-        # ToDo: below....
-        if 'contact' in self.params.get('words_localization', []):
-            pass
+                if "contact" in localizations:
+                    conditions.extend(
+                        [f"LOWER(c{i}.first_name) LIKE '%{word}%' OR LOWER(c{i}.last_name) LIKE '%{word}%'" for i in
+                         range(1, 5)])
+
+                if "alias" in localizations:
+                    conditions.extend([f"LOWER(a{i}.alias) LIKE '%{word}%'" for i in range(1, 5)])
+
+                if "address" in localizations:
+                    conditions.extend([f"LOWER(ea{i}.email_address) LIKE '%{word}%'" for i in range(1, 5)])
+
+                if "subject" in localizations:
+                    conditions.append(f"LOWER(e.subject) LIKE '%{word}%'")
+
+                if "body" in localizations:
+                    conditions.append(f"LOWER(e.body) LIKE '%{word}%'")
+
+                if "attachment_name" in localizations:
+                    conditions.append(f"LOWER(a.filename) LIKE '%{word}%'")
+
+                if "attachment" in localizations:
+                    conditions.append(f"LOWER(HEX(a.content)) LIKE '%{word}%'")
+
+                if conditions:
+                    #word_conditions.append(f"({' OR '.join(conditions)})")
+                    combined_condition = f"({' OR '.join(conditions)})"
+
+                    if combined_condition not in added_conditions:
+                        word_conditions.append(combined_condition)
+                        added_conditions.add(combined_condition)
+
+            if word_conditions:
+                self.add_where(f" {self.word_operator} ".join(word_conditions))
 
     def execute(self, request, params):
+        query = self.build_query()
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(request, params)
+            c.execute(request, params or [])
             results = c.fetchall()
         return results
 
-
-
-
-
-
-    def all_words_search(self, table, columns, words):
-        request = f"""SELECT id FROM {table} WHERE """
-        conditions = []
-
-        for word in words:
-            word_conditions = []
-            for column in columns:
-                word_conditions.append(f"LOWER({column}) LIKE '%' || LOWER(?) || '%'")
-            conditions.append(f"({' OR '.join(word_conditions)})")
-
-        request += " AND ".join(conditions)
-        return self
-
-
-
-
-    def _simple_word_search(self, table, columns, word):
-        request = self.sql_requests.simple_word_search(table=table, columns=columns)
-        parameters = tuple([word.lower()] * len(columns))
-        # print(f"Request:\n{request}")
-        # print(f"Parameters:\n{parameters}")
-
-        with sqlite3.connect(self.db_name) as conn:
-            c = conn.cursor()
-            # c.execute("SELECT name FROM sqlite_master WHERE type='table';")
-            # print(c.fetchall())
-            c.execute(request, parameters)
-            results = c.fetchall()
-        return results
-
-    def _all_words_search(self, table, columns, words):
-        request = self.sql_requests.all_words_search(table=table, columns=columns,words=words)
-        parameters = tuple(word.lower() for word in words for _ in columns)
-        # print(f"Request:\n{request}")
-        # print(f"Parameters:\n{parameters}")
-
-        with sqlite3.connect(self.db_name) as conn:
-            c = conn.cursor()
-            c.execute(request, parameters)
-            results = c.fetchall()
-        return results
-
-    def _any_words_search(self, table, columns, words, ids=None):
-        request = self.sql_requests.any_word_search(table=table, columns=columns,words=words, ids=ids)
-        if ids is not None:
-            pass
-        else:
-            parameters = tuple(word.lower() for word in words for _ in columns)
-        # print(f"Request:\n{request}")
-        # print(f"Parameters:\n{parameters}")
-
-        with sqlite3.connect(self.db_name) as conn:
-            c = conn.cursor()
-            c.execute(request, parameters)
-            results = c.fetchall()
-        return results
+    def show_query(self):
+        return self.build_query()

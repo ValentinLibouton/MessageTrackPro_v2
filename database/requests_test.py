@@ -1,15 +1,8 @@
 from database.database_retriever import DatabaseRetriever
 
-dbr = DatabaseRetriever()
-results = dbr.simple_word_search(table='Emails', columns=['subject', 'body'], word='squid')
-print(f"Simple word search: {len(results)} résultats.")
-print(f"Id's: {results}")
-
-
-results = dbr.all_words_search(table='Emails', columns=['subject', 'body'], words=['Valentin', 'Libouton'])
-print(f"All words search: {len(results)} résultats.")
-print(f"Id's: {results}")
-
-results = dbr.any_words_search(table='Emails', columns=['subject', 'body'], words=['Valentin', 'Libouton'])
-print(f"Any words search: {len(results)} résultats.")
-print(f"Id's: {results}")
+db_retriever = DatabaseRetriever(words=['emploi', 'travail'],
+                                 words_localization=['everywhere'],
+                                 word_operator="OR")
+db_retriever.join().where()
+#query = db_retriever.build_query()
+print(db_retriever.show_query())
