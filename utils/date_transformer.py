@@ -108,6 +108,8 @@ class DateTransformer(IDateTransformer):
 
 
     def change_time_shift(self, date_input: datetime):
+        if date_input is None:
+            return None
         if date_input.tzinfo is None:
             date_input = pytz.timezone(self.timezone_name).localize(date_input)
 

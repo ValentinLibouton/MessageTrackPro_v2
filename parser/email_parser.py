@@ -1,9 +1,11 @@
+import os
 from email import policy
 from email.parser import BytesParser
 import mailbox
 from .iemail_parser import IEmailParser
 from utils.string_cleaner import StringCleaner
 from utils.date_transformer import DateTransformer
+from utils.attachment_text_extractor import AttachmentTextExtractor
 from hasher.hasher import Hasher
 
 class EmailParser(IEmailParser):
@@ -11,6 +13,7 @@ class EmailParser(IEmailParser):
         self.sc = string_cleaner if string_cleaner else StringCleaner()
         self.dt = date_transformer if date_transformer else DateTransformer()
         self.hasher = hasher
+
     def parse_email(self, email_content):
         """
         Analyse le contenu d'un email et retourne un dictionnaire avec les données pertinentes.
@@ -24,6 +27,7 @@ class EmailParser(IEmailParser):
         msg = BytesParser(policy=policy.default).parsebytes(email_content)
         # print(f"msg keys: {msg.keys()}")
         email_id = self.hasher.hash_string(data=msg.as_bytes())
+        print(f"email_id: {email_id}")
         body, attachments = self.extract_body_and_attachments(msg=msg)
         # print(f"Date: {msg['date']}")
         date = self._transform_date(msg['date'])
@@ -39,10 +43,10 @@ class EmailParser(IEmailParser):
             'from_name': from_name,
             'from_address': from_address,
             'subject': msg['subject'],
-            'date_str': date.strftime('%Y-%m-%d %H:%M:%S'),
-            'date_obj': date,
-            'date_iso': date.isoformat(),
-            'timestamp': date.timestamp(),
+            'date_str': date.strftime('%Y-%m-%d %H:%M:%S') if date else None,
+            'date_obj': date if date else None,
+            'date_iso': date.isoformat() if date else None,
+            'timestamp': date.timestamp() if date else None,
             'to_names': to_names,
             'to_addresses': to_addresses,
             'cc_names': cc_names,
@@ -94,15 +98,36 @@ class EmailParser(IEmailParser):
                 content = part.get_payload(decode=True)
                 if content is not None:
                     attachment_id = self.hasher.hash_string(data=content)
+                    self._download_attachment(content=content, attachment_id=attachment_id, filename=filename)
+                    # ToDo !!!
+                    #extractor = AttachmentTextExtractor(file_content=content)
+                    #extracted_text = extractor.extract_text()
                     attachments.append({
                         'attachment_id': attachment_id,
                         'filename': filename,
-                        'content': content
+                        'content': content,
+                        'extracted_text': "extracted_text" # Todo !!!!
                     })
                 else:
                     # Handle the case where content is None
                     print(f"Warning: Attachment {filename} has no content and was skipped.")
         return body, attachments
+
+    def _download_attachment(self, content, attachment_id, filename, save_directory="attachments"):
+        try:
+            if not os.path.exists(save_directory):
+                os.makedirs(save_directory)
+
+            full_filename = f"{attachment_id}_{filename}"
+            filepath = os.path.join(save_directory, full_filename)
+
+            with open(filepath, 'wb') as f:
+                f.write(content)
+
+            print(f"Attachment saved to {filepath}")
+        except Exception as e:
+            raise Exception(f"{filename}: {e}")
+
 
     def _parse_names_addresses(self, data):
         list_names_and_addresses = self.split_name_address(fieldvalue=data)
