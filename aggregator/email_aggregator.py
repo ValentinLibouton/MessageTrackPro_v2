@@ -65,7 +65,8 @@ class EmailAggregator:
 
         for attachment in email['attachments']:
             attachment_id = attachment['attachment_id']
-            self._db.insert_attachment(id=attachment_id, filename=attachment['filename'], content=attachment['content'])
+            self._db.insert_attachment(id=attachment_id, filename=attachment['filename'],
+                                       content=attachment['content'], extracted_text=attachment['extracted_text'])
             self._db.link(table='Email_Attachments', col_name_1='email_id', col_name_2='attachment_id',
                           value_1=email_id, value_2=attachment_id)
 

@@ -94,12 +94,12 @@ class EmailDatabase:
                 timestamp_id = c.fetchone()[0]
             return timestamp_id
 
-    def insert_attachment(self, id, filename, content, return_existing_id=False):
+    def insert_attachment(self, id, filename, content, extracted_text, return_existing_id=False):
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.insert(table='Attachments',
-                                               columns=['id', 'filename', 'content'])
-                      , (id, filename, content))
+                                               columns=['id', 'filename', 'content', 'extracted_text'])
+                      , (id, filename, content, extracted_text))
             conn.commit()
             return id
 

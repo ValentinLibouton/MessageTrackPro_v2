@@ -2,13 +2,13 @@ import sqlite3
 from database.sql_request import SQLRequest
 from utils.date_transformer import DateTransformer
 class DatabaseRetriever:
-    def __init__(self, db_name='../database.db', **kwargs):
+    def __init__(self, db_name='database.db', **kwargs):
         """
         : contacts: filtering on specific contacts
         : aliases: filtering on specific aliases
         : addresses: filtering on specific email addresses
-        : start_date: filtering on start date
-        : end_date: filtering on end date
+        : start_date: filtering on start date, ex. str(YYYY-MM-DD hh:mm:ss)
+        : end_date: filtering on end date,ex. str(YYYY-MM-DD hh:mm:ss)
         : words: list of words to find
         :words_localization: list of words localization ['everywhere', 'contact', 'alias', 'address',
                                 'subject', 'body', 'attachment_name', 'attachment']
@@ -24,8 +24,9 @@ class DatabaseRetriever:
         self.words_localization_control()
         self.date_to_timestamp()
 
-        self.join_clauses = set()
+        self.join_clauses = []
         self.where_clauses = set()
+        self.where_and_clauses = set() # mandatory clauses (AND) ex. dates
         self.order_by_clause = ""
         self.limit_clause = ""
         self.request = ""
@@ -51,13 +52,18 @@ class DatabaseRetriever:
 
     def add_join(self, join_clause):
         if join_clause not in self.join_clauses:
+            if len(self.join_clauses) == 0:
+                join_clause = join_clause.replace('LEFT JOIN', 'JOIN', 1)
             self.request += f" {join_clause}"
-            self.join_clauses.add(join_clause)
+            self.join_clauses.append(join_clause)
 
     def add_where(self, condition):
         self.where_clauses.add(condition)
         return self
 
+    def add_where_and(self, condition):
+        self.where_and_clauses.add(f"({condition})")
+        return self
     def add_order_by(self, columns, ascending=True):
         order = "ASC" if ascending else "DESC"
         self.order_by_clause += f"ORDER BY {', '.join(columns)} {order}"
@@ -70,11 +76,23 @@ class DatabaseRetriever:
         self.select()
         if self.join_clauses:
             self.request += " " + " ".join(self.join_clauses)
+
+        if self.where_and_clauses:
+            self.request += " WHERE " + f" AND ".join(self.where_and_clauses)
+
         if self.where_clauses:
-            self.request += " WHERE " + f" {self.word_operator} ".join(self.where_clauses)
+            if self.where_and_clauses:
+                self.request += f" AND "
+            else:
+                self.request += " WHERE "
+            self.request += f" {self.word_operator} ".join(self.where_clauses)
+
         if self.order_by_clause:
+            # ToDo: Not implemented
             self.request += " " + self.order_by_clause
+
         if self.limit_clause:
+            # ToDo: Not implemented
             self.request += " " + self.limit_clause
         return self.request
 
@@ -95,6 +113,7 @@ class DatabaseRetriever:
                 or ('alias' in self.params.get('words_localization', []) and self.params.get('words', []))):
             self._join_email_addresses()
             self._join_contacts()
+            self._join_aliases()
 
         if (self.params.get('addresses')
                 or ('address' in self.params.get('words_localization', []) and self.params.get('words', []))):
@@ -111,34 +130,34 @@ class DatabaseRetriever:
         return self
 
     def _join_email_addresses(self):
-        self.add_join("JOIN Email_From ef ON e.id = ef.email_id")
-        self.add_join("JOIN Email_To ef ON e.id = et.email_id")
-        self.add_join("JOIN Email_Cc ec ON e.id = ec.email_id")
-        self.add_join("JOIN Email_Bcc eb ON e.id = eb.email_id")
+        self.add_join("LEFT JOIN Email_From ef ON e.id = ef.email_id")
+        self.add_join("LEFT JOIN Email_To et ON e.id = et.email_id")
+        self.add_join("LEFT JOIN Email_Cc ec ON e.id = ec.email_id")
+        self.add_join("LEFT JOIN Email_Bcc eb ON e.id = eb.email_id")
 
-        # self.add_join("JOIN EmailAddresses ea1 ON ea1.id = ef.email_address_id")
-        # self.add_join("JOIN EmailAddresses ea2 ON ea2.id = et.email_address_id")
-        # self.add_join("JOIN EmailAddresses ea3 ON ea3.id = ec.email_address_id")
-        # self.add_join("JOIN EmailAddresses ea4 ON ea4.id = eb.email_address_id")
-        self.add_join("JOIN EmailAddresses ea ON ea.id IN (ef.email_address_id, et.email_address_id, ec.email_address_id, eb.email_address_id)")
+        self.add_join("LEFT JOIN EmailAddresses ea1 ON ea1.id = ef.email_address_id")
+        self.add_join("LEFT JOIN EmailAddresses ea2 ON ea2.id = et.email_address_id")
+        self.add_join("LEFT JOIN EmailAddresses ea3 ON ea3.id = ec.email_address_id")
+        self.add_join("LEFT JOIN EmailAddresses ea4 ON ea4.id = eb.email_address_id")
+
 
     def _join_contacts(self):
-        [self.add_join(f"JOIN Contacts_EmailAddresses cea{i} ON ea{i}.id = cea{i}.email_address_id") for i in range(1, 5)]
-        [self.add_join(f"JOIN Contacts c{i} ON cea{i}.contact_id = c{i}.id") for i in range(1, 5)]
+        [self.add_join(f"LEFT JOIN Contacts_EmailAddresses cea{i} ON ea{i}.id = cea{i}.email_address_id") for i in range(1, 5)]
+        [self.add_join(f"LEFT JOIN Contacts c{i} ON cea{i}.contact_id = c{i}.id") for i in range(1, 5)]
 
     def _join_aliases(self):
-        [self.add_join(f"JOIN Contacts_Alias ca{i} ON c{i}.id = ca{i}.contact_id") for i in range(1, 5)]
-        [self.add_join(f"JOIN Alias a{i} ON ca{i}.alias_id = a{i}.id") for i in range(1, 5)]
+        [self.add_join(f"LEFT JOIN Contacts_Alias ca{i} ON c{i}.id = ca{i}.contact_id") for i in range(1, 5)]
+        [self.add_join(f"LEFT JOIN Alias a{i} ON ca{i}.alias_id = a{i}.id") for i in range(1, 5)]
 
     def _join_dates(self):
-        #self.add_join("JOIN Email_Date ed ON e.id = ed.email_id")
-        #self.add_join("JOIN Date d ON ed.date_id = d.id")
-        self.add_join("JOIN Email_Timestamp eti ON e.id = eti.email_id")
-        self.add_join("JOIN Timestamp ts ON eti.timestamp_id = ts.id")
+        #self.add_join("LEFT JOIN Email_Date ed ON e.id = ed.email_id")
+        #self.add_join("LEFT JOIN Date d ON ed.date_id = d.id")
+        self.add_join("LEFT JOIN Email_Timestamp eti ON e.id = eti.email_id")
+        self.add_join("LEFT JOIN Timestamp ts ON eti.timestamp_id = ts.id")
 
     def _join_attachments(self):
-        self.add_join("JOIN Email_Attachments ea ON e.id = ea.email_id")
-        self.add_join("JOIN Attachments a ON ea.attachment_id = a.id")
+        self.add_join("LEFT JOIN Email_Attachments ea ON e.id = ea.email_id")
+        self.add_join("LEFT JOIN Attachments a ON ea.attachment_id = a.id")
 
     def where(self):
         self._where_date()
@@ -151,17 +170,20 @@ class DatabaseRetriever:
 
 
     def _where_date(self):
+        date_conditions = []
         if self.params.get('start_date') and self.params.get('end_date'):
-            self.add_where(f"ts.timestamp BETWEEN '{self.start_timestamp}' AND '{self.end_timestamp}'")
+            date_conditions.append(f"ts.timestamp BETWEEN '{self.start_timestamp}' AND '{self.end_timestamp}'")
         elif self.params.get('start_date'):
-            self.add_where(f"ts.timestamp >= '{self.start_timestamp}'")
+            date_conditions.append(f"ts.timestamp >= '{self.start_timestamp}'")
         elif self.params.get('end_date'):
-            self.add_where(f"ts.timestamp <= '{self.end_timestamp}'")
+            date_conditions.append(f"ts.timestamp <= '{self.end_timestamp}'")
+        if date_conditions:
+            self.add_where_and(condition=" AND ".join(date_conditions))
 
     def _where_contacts(self):
         if self.params.get('contacts'):
             contact_conditions = " OR ".join(
-                [f"LOWER(c{i}.first_name) = LOWER({first_name}) AND LOWER(c{i}.last_name) = LOWER({last_name})"
+                [f"LOWER(c{i}.first_name) = LOWER('{first_name}') AND LOWER(c{i}.last_name) = LOWER('{last_name}')"
                 for first_name, last_name in self.params['contacts'] for i in range(1,5)])
             self.add_where(f"({contact_conditions})")
 
@@ -174,7 +196,7 @@ class DatabaseRetriever:
     def _where_addresses(self):
         if self.params.get('addresses'):
             address_conditions = " OR ".join(
-                [f"LOWER(ea{i}.address) = LOWER('{address}" for address in self.params['addresses'] for i in range(1, 5)])
+                [f"LOWER(ea{i}.email_address) = LOWER('{address}')" for address in self.params['addresses'] for i in range(1, 5)])
             self.add_where(f"({address_conditions})")
 
     def _where_attachments_types(self):
@@ -218,7 +240,9 @@ class DatabaseRetriever:
                     conditions.append(f"LOWER(a.filename) LIKE '%{word}%'")
 
                 if "attachment" in localizations:
-                    conditions.append(f"LOWER(HEX(a.content)) LIKE '%{word}%'")
+                    # ToDo: I need to develop a class which, depending on the type of extension,
+                    #  will try to retrieve the text from EmailParser and add a column to the db to display the extracted text.
+                    conditions.append(f"LOWER(a.extracted_text) LIKE '%{word}%'")
 
                 if conditions:
                     #word_conditions.append(f"({' OR '.join(conditions)})")
@@ -231,11 +255,11 @@ class DatabaseRetriever:
             if word_conditions:
                 self.add_where(f" {self.word_operator} ".join(word_conditions))
 
-    def execute(self, request, params):
+    def execute(self, params=None):
         query = self.build_query()
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(request, params or [])
+            c.execute(query, params or [])
             results = c.fetchall()
         return results
 

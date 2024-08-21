@@ -95,7 +95,8 @@ CREATE TABLE IF NOT EXISTS Email_Bcc(
 CREATE TABLE IF NOT EXISTS Attachments(
     id TEXT PRIMARY KEY,
     filename TEXT,
-    content BLOB
+    content BLOB,
+    extracted_text TEXT
 );
 
 CREATE TABLE IF NOT EXISTS Email_Attachments(
