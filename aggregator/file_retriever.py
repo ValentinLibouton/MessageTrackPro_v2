@@ -1,6 +1,7 @@
 import os
 from aggregator.file_detector import FileDetector
 from aggregator.ifile_retriever import IFileRetriever
+from utils.log import log_file_retriever
 
 class FileRetriever(IFileRetriever):
     def __init__(self, path, supported_extensions, file_detector_class=FileDetector):
@@ -10,6 +11,7 @@ class FileRetriever(IFileRetriever):
         self.file_detector_class = file_detector_class
 
     def retrieve_files_path(self):
+        log_file_retriever.info("Func: retrieve_files_path")
         #print(f"Exploration du chemin : {self.__path}")
         if os.path.isdir(self.__path):
             for root, dirs, files in os.walk(self.__path):
@@ -33,9 +35,11 @@ class FileRetriever(IFileRetriever):
         file_type = detector.detect()
 
         if file_type == 'email':
+            log_file_retriever.info("Func: __add_file_to_dict, add email file")
             #print(f"Fichier email détecté : {file_path}")
             self.__filepath_dict.setdefault('emails', []).append(file_path)
         elif file_type == 'mbox':
+            log_file_retriever.info("Func: __add_file_to_dict, add mbox file")
             #print(f"Fichier mbox détecté : {file_path}")
             self.__filepath_dict.setdefault('mbox', []).append(file_path)
         else:

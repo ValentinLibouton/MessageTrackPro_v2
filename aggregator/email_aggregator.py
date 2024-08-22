@@ -11,6 +11,8 @@ import os
 import psutil
 import mailbox
 from utils.log import log_email_aggregator
+import tempfile
+from aggregator.mbox_email_streamer import MboxEmailStreamer
 
 class EmailAggregator:
     def __init__(self, file_retriever: FileRetriever,
@@ -27,52 +29,27 @@ class EmailAggregator:
         email_list = self._file_retriever.filepath_dict.get('emails', [])
         mbox_list = self._file_retriever.filepath_dict.get('mbox', [])
 
-        log_email_aggregator.info("Func: retrieve_and_aggregate_emails, Start process email files")
-        self.process_email_files(email_list)
-        log_email_aggregator.info("Func: retrieve_and_aggregate_emails, End process email files")
-
         log_email_aggregator.info("Func: retrieve_and_aggregate_emails, Start process mbox files")
         self.process_email_files(mbox_list)
         log_email_aggregator.info("Func: retrieve_and_aggregate_emails, End process mbox files")
 
-    def batch_process(self, items, batch_size, process_func, *args):
-        """
-        Process items in batches with parallel processing using ProcessPoolExecutor.
+        log_email_aggregator.info("Func: retrieve_and_aggregate_emails, Start process email files")
+        self.process_email_files(email_list)
+        log_email_aggregator.info("Func: retrieve_and_aggregate_emails, End process email files")
 
-        :param items: The list of items to process.
-        :param batch_size: The size of each batch.
-        :param process_func: The function to process each item.
-        :param args: Additional arguments to pass to the processing function.
-        :return: A list of results.
-        """
-        log_email_aggregator.info(f"Func: batch_process, Batch size:{batch_size}, Process func:{process_func}")
-        results = []
-        batch = []
-        with tqdm(total=len(items), desc="Processing items", file=sys.stdout, leave=True) as pbar:
-            for item in items:
-                batch.append(item)
-                if len(batch) >= batch_size:
-                    results += self._process_batch(batch, process_func, *args)
-                    batch.clear()
-                    pbar.update(batch_size)
-            if batch:
-                results += self._process_batch(batch, process_func, *args)
-                pbar.update(len(batch))
-        return results
 
-    def _process_batch(self, batch, process_func, *args):
-        """
-        Helper method to process a batch of items using ProcessPoolExecutor.
 
-        :param batch: The batch of items to process.
-        :param process_func: The function to process each item.
-        :param args: Additional arguments to pass to the processing function.
-        :return: A list of results from the batch.
-        """
-        log_email_aggregator.info(f"Func: _process_batch, Process func:{process_func}")
+    def add_emails(self, emails):
         with ProcessPoolExecutor(max_workers=SystemConfig.MAX_WORKERS) as executor:
-            futures = [executor.submit(process_func, *item, *args) for item in batch]
-            return [future.result() for future in as_completed(futures)]
+            futures = []
+            with tqdm(total=len(emails), desc="Adding emails", file=sys.stdout, leave=True) as pbar:
+                for email in emails:
+                    future = executor.submit(self.add_email, *email)
+                    futures.append(future)
+
+                for future in as_completed(futures):
+                    future.result()  # To raise any exceptions
+                    pbar.update(1)
 
     def add_email(self, file_path, email):
         email_id = self._db.insert_email(id=email['email_id'],
@@ -119,13 +96,7 @@ class EmailAggregator:
             self._db.link(table='Email_Attachments', col_name_1='email_id', col_name_2='attachment_id',
                           value_1=email_id, value_2=attachment_id)
 
-    def add_emails(self, emails):
-        self.batch_process(emails, SystemConfig.DEFAULT_BATCH_SIZE, self.add_email)
 
-    def process_email_files_old(self, email_files):
-        processed_emails = self.batch_process(email_files, SystemConfig.DEFAULT_BATCH_SIZE, self.process_email_file)
-        for file_path, email in processed_emails:
-            self.add_email(file_path, email)
 
     def process_email_files(self, email_files):
         emails = []
@@ -138,25 +109,6 @@ class EmailAggregator:
         if emails:
             self.add_emails(emails)
 
-    def process_mbox_files(self, mbox_files):
-        for file_path in mbox_files:
-            mbox = mailbox.mbox(file_path)
-            emails = []
-            for message in mbox:
-                # Traiter le message et l'ajouter au batch
-                email = self.process_mbox_file(message, file_path)
-                emails.append(email)
-
-                # Si le batch atteint la taille définie, traiter les emails
-                if len(emails) >= SystemConfig.DEFAULT_BATCH_SIZE:
-                    self.add_emails(emails)
-                    emails.clear()  # Vider le batch après traitement
-
-            # Traiter les emails restants dans le batch
-            if emails:
-                self.add_emails(emails)
-
-
     def process_email_file(self, file_path):
         with open(file_path, 'rb') as f:
             email_content = f.read()
@@ -164,11 +116,64 @@ class EmailAggregator:
             email = self._ep.parse_email(email_content=email_content)
             return file_path, email
 
-    def process_mbox_file(self, message, file_path):
+    def process_mbox_files_old(self, mbox_files):
+        for file_path in mbox_files:
+            mbox = mailbox.mbox(file_path)
+            emails = []
+            with tqdm(total=len(mbox), desc=f"Processing mbox: {os.path.basename(file_path)}", file=sys.stdout,
+                      leave=True) as pbar:
+                for message in mbox:
+                    file_path, email = self.process_message_from_mbox_file(message, file_path)
+                    emails.append((file_path, email))
+
+                    # If the batch reaches the size defined in SystemConfig, process the emails
+                    if len(emails) >= SystemConfig.DEFAULT_BATCH_SIZE:
+                        self.add_emails(emails)
+                        emails.clear()  # Clear the batch after processing
+                        pbar.update(SystemConfig.DEFAULT_BATCH_SIZE)
+
+                # Process any remaining emails in the batch
+                if emails:
+                    self.add_emails(emails)
+                    pbar.update(len(emails))
+
+    def process_mbox_files(self, mbox_files):
+        log_email_aggregator.info("Func: process_mbox_files")
+        for mbox_file in mbox_files:
+            # Créer une instance de MboxEmailStreamer pour le fichier mbox
+            streamer = MboxEmailStreamer(mbox_file)
+
+            def process_single_email(email_message):
+                """
+                Fonction de traitement pour un seul email.
+                """
+                email_content = email_message.as_bytes()
+                email = self._ep.parse_email(email_content=email_content)
+                self.add_email(mbox_file, email)
+
+            # Utilisation de la fonction de traitement
+            streamer.process_emails(process_single_email, show_progress=True)
+
+    def process_message_from_mbox_file(self, message, file_path):
         email_content = message.as_bytes()
         email = self._ep.parse_email(email_content=email_content)
         return file_path, email
 
-    @property
-    def aggregated_data_dict(self):
-        pass
+    def process_large_mbox_to_eml(self, mbox_file):
+        log_email_aggregator.info("Func: process_large_mbox_to_eml")
+        temp_dir = tempfile.mkdtemp()  # Create a temporary directory for eml files
+
+        with open(mbox_file, 'rb') as f:
+            mbox = mailbox.UnixMailbox(f, factory=mailbox.mboxMessage)
+
+            for i, message in enumerate(mbox):
+                log_email_aggregator.info(f"Func: process_large_mbox_to_eml, element n°{i}")
+                temp_eml_path = os.path.join(temp_dir, f'email_{i}.eml')
+                with open(temp_eml_path, 'wb') as eml_file:
+                    eml_file.write(message.as_bytes())
+
+                # Process the individual eml file
+                self.process_email_files([temp_eml_path])
+
+                # Delete the temporary eml file after processing
+                os.remove(temp_eml_path)
