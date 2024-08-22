@@ -5,6 +5,7 @@ from aggregator.file_detector import FileDetector
 from parser.email_parser import EmailParser
 from database.email_database import EmailDatabase
 
+
 def paths_to_dict():
     """This is a temporary function for project development..."""
     paths = {}
@@ -17,9 +18,9 @@ def paths_to_dict():
     return paths
 
 def create_and_fill_database():
-    path = paths_to_dict()['emails_eml']
-    # path = paths_to_dict()['all_emails']
-    print(path)
+    #path = paths_to_dict()['emails_eml']
+    path = paths_to_dict()['all_emails']
+    #print(path)
     hasher = Hasher()
     supported_extensions = ['.outlook.com', '.eml', '.mbox', '.msg', '.pst', '.ost', '.oft', '.olm']
     file_retriever = FileRetriever(path=path, supported_extensions=supported_extensions,
@@ -55,6 +56,9 @@ def retrieve():
     # Print the results
     for i, id in enumerate(ids, start=1):
         print(f"ID{i}:\t{id[0]}")
+
+
+
 
 if __name__ == '__main__':
     create_and_fill_database()

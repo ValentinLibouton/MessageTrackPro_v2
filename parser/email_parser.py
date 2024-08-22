@@ -1,3 +1,4 @@
+import gc
 import os
 from email import policy
 from email.parser import BytesParser
@@ -5,7 +6,6 @@ import mailbox
 from .iemail_parser import IEmailParser
 from utils.string_cleaner import StringCleaner
 from utils.date_transformer import DateTransformer
-from utils.attachment_text_extractor import AttachmentTextExtractor
 from hasher.hasher import Hasher
 
 class EmailParser(IEmailParser):
@@ -27,7 +27,7 @@ class EmailParser(IEmailParser):
         msg = BytesParser(policy=policy.default).parsebytes(email_content)
         # print(f"msg keys: {msg.keys()}")
         email_id = self.hasher.hash_string(data=msg.as_bytes())
-        print(f"email_id: {email_id}")
+        #print(f"email_id: {email_id}")
         body, attachments = self.extract_body_and_attachments(msg=msg)
         # print(f"Date: {msg['date']}")
         date = self._transform_date(msg['date'])
@@ -108,6 +108,8 @@ class EmailParser(IEmailParser):
                         'content': content,
                         'extracted_text': "extracted_text" # Todo !!!!
                     })
+                    del content
+                    gc.collect()
                 else:
                     # Handle the case where content is None
                     print(f"Warning: Attachment {filename} has no content and was skipped.")
@@ -118,13 +120,13 @@ class EmailParser(IEmailParser):
             if not os.path.exists(save_directory):
                 os.makedirs(save_directory)
 
-            full_filename = f"{attachment_id}_{filename}"
-            filepath = os.path.join(save_directory, full_filename)
+            new_filename = self.sc.rename_file(filename=filename, new_name=attachment_id)
+            filepath = os.path.join(save_directory, new_filename)
 
             with open(filepath, 'wb') as f:
                 f.write(content)
 
-            print(f"Attachment saved to {filepath}")
+            #print(f"Attachment saved to {filepath}")
         except Exception as e:
             raise Exception(f"{filename}: {e}")
 

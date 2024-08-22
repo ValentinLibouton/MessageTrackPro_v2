@@ -4,6 +4,7 @@ class StringCleaner(IStringCleaner):
         if exclude_chars is None:
             exclude_chars = ['<', '>', '\\', '/', '"', "'", ':', ';']
         self.exclude_chars = exclude_chars
+        self.forbidden_chars_in_file_names = ['\\', '/', ':', '*', '?', '"', '<', '>', '|']
 
     def remove_chars(self, data, exclude_chars=None):
         if exclude_chars is None:
@@ -62,3 +63,19 @@ class StringCleaner(IStringCleaner):
             return data
         else:
             raise TypeError(f"[replace_chars_by_char] Unsupported type: {type(data)}")
+
+    def rename_file(self, filename: str, new_name: str) -> str:
+        """
+        Renames the file by replacing the filename while keeping the extension intact.
+
+        :param filename: Original filename with extension.
+        :param new_name: New name to replace the original filename (without extension).
+        :return: New filename with the original extension.
+        """
+        if '.' in filename:
+            name, extension = filename.rsplit('.', 1)
+            cleaned_new_name = self.remove_chars(data=new_name, exclude_chars=self.forbidden_chars_in_file_names)
+            new_filename = f"{cleaned_new_name}.{extension}"
+        else:
+            new_filename = self.remove_chars(data=new_name, exclude_chars=self.forbidden_chars_in_file_names)
+        return new_filename

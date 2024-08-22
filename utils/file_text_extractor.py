@@ -212,6 +212,6 @@ class FileTextExtractor:
 
 
 if __name__ == "__main__":
-    file_path = "..."
+    file_path = "/home/valentin/github/MessageTrackPro_v2/attachments/fee82a7202eb32c93010e141a6f601ef710b8343bfc32b0a273e30908c0b254d.doc"
     file_text_extractor = FileTextExtractor(file_path=file_path)
     print(file_text_extractor.extract_text())
