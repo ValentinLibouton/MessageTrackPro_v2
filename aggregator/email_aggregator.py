@@ -12,6 +12,8 @@ import psutil
 import mailbox
 from utils.log import log_email_aggregator
 from aggregator.mbox_extractor import MboxExtractor
+from queue import Queue
+from threading import Thread
 
 
 class EmailAggregator:
@@ -75,16 +77,35 @@ class EmailAggregator:
             return file_path, email
 
     def add_emails(self, emails):
-        with ProcessPoolExecutor(max_workers=SystemConfig.MAX_WORKERS) as executor:
-            futures = []
-            with tqdm(total=len(emails), desc="Adding emails", file=sys.stdout, leave=True) as pbar:
-                for email in emails:
-                    future = executor.submit(self.add_email, *email)
-                    futures.append(future)
+        def worker():
+            while True:
+                email = q.get()
+                if email is None:
+                    break
+                self.add_email(*email)
+                pbar.update(1)
+                q.task_done()
 
-                for future in as_completed(futures):
-                    future.result()  # To raise any exceptions
-                    pbar.update(1)
+        q = Queue()
+        num_worker_threads = SystemConfig.MAX_WORKERS
+        threads = []
+        for i in range(num_worker_threads):
+            t = Thread(target=worker)
+            t.start()
+            threads.append(t)
+
+        with tqdm(total=len(emails), desc="Adding emails", file=sys.stdout, leave=True) as pbar:
+            for email in emails:
+                q.put(email)
+
+            # block until all tasks are done
+            q.join()
+
+            # stop workers
+            for i in range(num_worker_threads):
+                q.put(None)
+            for t in threads:
+                t.join()
 
     def add_email(self, file_path, email):
         email_id = self._db.insert_email(id=email['email_id'],

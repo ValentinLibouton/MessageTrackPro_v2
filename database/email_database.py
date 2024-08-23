@@ -24,7 +24,7 @@ class EmailDatabase:
 
 
     def insert_contact(self, first_name, last_name, return_existing_id=False):
-        log_email_database.info(f"Func: insert_contact")
+        #log_email_database.info(f"Func: insert_contact")
         first_name = self.string_cleaner.to_lower_and_strip(first_name)
         last_name = self.string_cleaner.to_lower_and_strip(last_name)
         with sqlite3.connect(self.db_name) as conn:
@@ -39,7 +39,7 @@ class EmailDatabase:
             return contact_id
 
     def insert_alias(self, alias, return_existing_id=False):
-        log_email_database.info(f"Func: insert_alias")
+        #log_email_database.info(f"Func: insert_alias")
         alias = self.string_cleaner.to_lower_and_strip(alias)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
@@ -53,7 +53,7 @@ class EmailDatabase:
             return alias_id
 
     def insert_email_address(self, email_address, return_existing_id=False):
-        log_email_database.info(f"Func: insert_email_address")
+        #log_email_database.info(f"Func: insert_email_address")
         email_address = self.string_cleaner.to_lower_and_strip(email_address)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
@@ -77,7 +77,7 @@ class EmailDatabase:
             return id
 
     def insert_date(self, date, return_existing_id=False):
-        log_email_database.info(f"Func: insert_date")
+        #log_email_database.info(f"Func: insert_date")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.insert(table='Date',
@@ -90,7 +90,7 @@ class EmailDatabase:
             return date_id
 
     def insert_timestamp(self, timestamp, return_existing_id=False):
-        log_email_database.info(f"Func: insert_timestamp")
+        #log_email_database.info(f"Func: insert_timestamp")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.insert(table='Timestamp',
@@ -114,7 +114,7 @@ class EmailDatabase:
 
     def link(self, table, col_name_1, col_name_2, value_1, value_2):
         """Only 'value_2' can be of type (list, tuple, set) in addition to being of type int or str"""
-        log_email_database.info(f"Func: link, Table: {table}")
+        #log_email_database.info(f"Func: link, Table: {table}")
         request = self.sql_requests.link(table=table, col_name_1=col_name_1, col_name_2=col_name_2)
         if isinstance(value_2, (list, tuple, set)):
             with sqlite3.connect(self.db_name) as conn:

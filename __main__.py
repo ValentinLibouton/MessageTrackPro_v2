@@ -29,8 +29,9 @@ def create_and_fill_database():
     # file_retriever.retrieve_files_path()
     # print(file_retriever.filepath_dict)
     email_database = EmailDatabase()
+    mbox_temp_directory = paths_to_dict()['tmp']
     aggregator = EmailAggregator(file_retriever=file_retriever, email_parser=email_parser,
-                                 email_database=email_database)
+                                 email_database=email_database, mbox_temp_directory=mbox_temp_directory)
 
 def retrieve():
     from database.database_retriever import DatabaseRetriever

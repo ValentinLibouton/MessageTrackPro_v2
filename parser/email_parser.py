@@ -138,7 +138,7 @@ class EmailParser(IEmailParser):
 
 
     def _parse_names_addresses(self, data):
-        log_email_parser.info("Func: _parse_names_addresses")
+        #log_email_parser.info("Func: _parse_names_addresses")
         list_names_and_addresses = self.split_name_address(fieldvalue=data)
         names, addresses = self.separate_names_and_addresses_from_list(list_names_and_addresses)
         names = self.sc.replace_chars_by_char(data=names, current_chars={'.'}, new_char=' ')
@@ -146,7 +146,7 @@ class EmailParser(IEmailParser):
 
 
     def _transform_date(self, date_input):
-        log_email_parser.info("Func: _transform_date")
+        #log_email_parser.info("Func: _transform_date")
         date_obj = self.dt.parse_email_date(date_input=date_input)
         date_obj = self.dt.change_time_shift(date_input=date_obj)
         return date_obj
@@ -159,7 +159,7 @@ class EmailParser(IEmailParser):
         Sometimes a name is the e-mail address, so the person field will contain the address twice,
         and therefore twice '@'.
         """
-        log_email_parser.info("Func: split_name_address")
+        #log_email_parser.info("Func: split_name_address")
         if fieldvalue is None:
             return None
         if not isinstance(fieldvalue, str):
@@ -198,7 +198,7 @@ class EmailParser(IEmailParser):
 
     def separate_names_and_addresses_from_list(self, list_of_name_address_tuple: list) -> tuple:
         """For e-mail address fields"""
-        log_email_parser.info("Func: separate_names_and_addresses_from_list")
+        #log_email_parser.info("Func: separate_names_and_addresses_from_list")
         if not list_of_name_address_tuple:
             return [], []
         names, addresses = zip(*list_of_name_address_tuple)
