@@ -11,18 +11,25 @@ import os
 import psutil
 import mailbox
 from utils.log import log_email_aggregator
-import tempfile
-from aggregator.mbox_email_streamer import MboxEmailStreamer
+from aggregator.mbox_extractor import MboxExtractor
+
 
 class EmailAggregator:
     def __init__(self, file_retriever: FileRetriever,
                  email_parser: EmailParser,
                  email_database: EmailDatabase,
-                 with_attachments=False):
+                 mbox_temp_directory: str = None,
+                 with_attachments: bool = False,
+                 delete_temp_files: bool = False):
+        self.temp_dir_name = None
         self._file_retriever = file_retriever
         self._ep = email_parser
         self._db = email_database
+        self.delete_temp_files = delete_temp_files
+        self.mbox_temp_directory = mbox_temp_directory
         self.retrieve_and_aggregate_emails()
+        self.with_attachments = with_attachments  #Todo pas encore utilisé, peut-être à supprimer
+
 
     def retrieve_and_aggregate_emails(self):
         self._file_retriever.retrieve_files_path()
@@ -30,14 +37,42 @@ class EmailAggregator:
         mbox_list = self._file_retriever.filepath_dict.get('mbox', [])
 
         log_email_aggregator.info("Func: retrieve_and_aggregate_emails, Start process mbox files")
-        self.process_email_files(mbox_list)
+        self.process_mbox_files(mbox_list=mbox_list)
         log_email_aggregator.info("Func: retrieve_and_aggregate_emails, End process mbox files")
 
         log_email_aggregator.info("Func: retrieve_and_aggregate_emails, Start process email files")
-        self.process_email_files(email_list)
+        self.process_email_files(email_files=email_list)
         log_email_aggregator.info("Func: retrieve_and_aggregate_emails, End process email files")
 
+    def process_mbox_files(self, mbox_list):
+        for i, mbox_file in enumerate(mbox_list):
+            self.create_temp_dir(temp_dir=self.mbox_temp_directory, sub_dir_name=f"mbox_temp_{i + 1}")
+            self.process_mbox_file(mbox_file=mbox_file)
 
+    def process_mbox_file(self, mbox_file):
+        mbe = MboxExtractor(mbox_file_path=mbox_file, temp_dir=self.temp_dir_name)
+        temp_paths = mbe.extract_emails()
+        self.process_email_files(email_files=temp_paths)
+        if self.delete_temp_files:
+            self.remove_files(paths_list=temp_paths)
+
+    def process_email_files(self, email_files):
+        emails = []
+        for email_file in email_files:
+            file_path, email = self.process_email_file(file_path=email_file)
+            emails.append((file_path, email))
+            if len(emails) > SystemConfig.DEFAULT_BATCH_SIZE:
+                self.add_emails(emails)
+                emails.clear()
+        if emails:
+            self.add_emails(emails)
+
+    def process_email_file(self, file_path):
+        with open(file_path, 'rb') as f:
+            email_content = f.read()
+            # print(f"Fichier: {file_path}")
+            email = self._ep.parse_email(email_content=email_content)
+            return file_path, email
 
     def add_emails(self, emails):
         with ProcessPoolExecutor(max_workers=SystemConfig.MAX_WORKERS) as executor:
@@ -96,84 +131,17 @@ class EmailAggregator:
             self._db.link(table='Email_Attachments', col_name_1='email_id', col_name_2='attachment_id',
                           value_1=email_id, value_2=attachment_id)
 
+    def remove_files(self, paths_list):
+        for file_path in paths_list:
+            try:
+                os.remove(file_path)
+                log_email_aggregator.info(f"Deleted temporary file: {file_path}")
+            except Exception as e:
+                log_email_aggregator.error(f"Failed to delete temporary file: {file_path}. Error: {e}")
 
-
-    def process_email_files(self, email_files):
-        emails = []
-        for email_file in email_files:
-            file_path, email = self.process_email_file(file_path=email_file)
-            emails.append((file_path, email))
-            if len(emails) > SystemConfig.DEFAULT_BATCH_SIZE:
-                self.add_emails(emails)
-                emails.clear()
-        if emails:
-            self.add_emails(emails)
-
-    def process_email_file(self, file_path):
-        with open(file_path, 'rb') as f:
-            email_content = f.read()
-            # print(f"Fichier: {file_path}")
-            email = self._ep.parse_email(email_content=email_content)
-            return file_path, email
-
-    def process_mbox_files_old(self, mbox_files):
-        for file_path in mbox_files:
-            mbox = mailbox.mbox(file_path)
-            emails = []
-            with tqdm(total=len(mbox), desc=f"Processing mbox: {os.path.basename(file_path)}", file=sys.stdout,
-                      leave=True) as pbar:
-                for message in mbox:
-                    file_path, email = self.process_message_from_mbox_file(message, file_path)
-                    emails.append((file_path, email))
-
-                    # If the batch reaches the size defined in SystemConfig, process the emails
-                    if len(emails) >= SystemConfig.DEFAULT_BATCH_SIZE:
-                        self.add_emails(emails)
-                        emails.clear()  # Clear the batch after processing
-                        pbar.update(SystemConfig.DEFAULT_BATCH_SIZE)
-
-                # Process any remaining emails in the batch
-                if emails:
-                    self.add_emails(emails)
-                    pbar.update(len(emails))
-
-    def process_mbox_files(self, mbox_files):
-        log_email_aggregator.info("Func: process_mbox_files")
-        for mbox_file in mbox_files:
-            # Créer une instance de MboxEmailStreamer pour le fichier mbox
-            streamer = MboxEmailStreamer(mbox_file)
-
-            def process_single_email(email_message):
-                """
-                Fonction de traitement pour un seul email.
-                """
-                email_content = email_message.as_bytes()
-                email = self._ep.parse_email(email_content=email_content)
-                self.add_email(mbox_file, email)
-
-            # Utilisation de la fonction de traitement
-            streamer.process_emails(process_single_email, show_progress=True)
-
-    def process_message_from_mbox_file(self, message, file_path):
-        email_content = message.as_bytes()
-        email = self._ep.parse_email(email_content=email_content)
-        return file_path, email
-
-    def process_large_mbox_to_eml(self, mbox_file):
-        log_email_aggregator.info("Func: process_large_mbox_to_eml")
-        temp_dir = tempfile.mkdtemp()  # Create a temporary directory for eml files
-
-        with open(mbox_file, 'rb') as f:
-            mbox = mailbox.UnixMailbox(f, factory=mailbox.mboxMessage)
-
-            for i, message in enumerate(mbox):
-                log_email_aggregator.info(f"Func: process_large_mbox_to_eml, element n°{i}")
-                temp_eml_path = os.path.join(temp_dir, f'email_{i}.eml')
-                with open(temp_eml_path, 'wb') as eml_file:
-                    eml_file.write(message.as_bytes())
-
-                # Process the individual eml file
-                self.process_email_files([temp_eml_path])
-
-                # Delete the temporary eml file after processing
-                os.remove(temp_eml_path)
+    def create_temp_dir(self, temp_dir, sub_dir_name):
+        if not temp_dir:
+            temp_dir = os.getcwd()
+        self.temp_dir_name = os.path.join(temp_dir, sub_dir_name)
+        os.makedirs(self.temp_dir_name, exist_ok=True)
+        log_email_aggregator.info(f"Created directory: {self.temp_dir_name}")
