@@ -1,7 +1,7 @@
 import os
 from aggregator.file_detector import FileDetector
 from aggregator.ifile_retriever import IFileRetriever
-from utils.log import log_file_retriever
+from utils.logging_setup import log_file_retriever
 
 class FileRetriever(IFileRetriever):
     def __init__(self, path, supported_extensions, file_detector_class=FileDetector):

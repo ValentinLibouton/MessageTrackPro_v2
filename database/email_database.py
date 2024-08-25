@@ -1,11 +1,12 @@
 import sqlite3
 from database.sql_request import SQLRequest
 from utils.string_cleaner import StringCleaner
-from utils.log import log_email_database
+from utils.logging_setup import log_email_database
+from config.db_constants import DBConstants
 
 
 class EmailDatabase:
-    def __init__(self, db_name='database.db', sql_file='database/database.sql', string_cleaner=None, sql_requests=None):
+    def __init__(self, db_name=DBConstants.db_name, sql_file=DBConstants.sql_name, string_cleaner=None, sql_requests=None):
         self.string_cleaner = string_cleaner if string_cleaner else StringCleaner()
         self.db_name = db_name
         self.sql_file = sql_file
@@ -29,12 +30,14 @@ class EmailDatabase:
         last_name = self.string_cleaner.to_lower_and_strip(last_name)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert(table='Contacts',
-                                               columns=['first_name', 'last_name']), (first_name, last_name))
+            c.execute(self.sql_requests.insert(table=DBConstants.CONTACTS_TABLE,
+                                               columns=DBConstants.CONTACTS_COLUMNS)
+                      , (first_name, last_name))
             contact_id = c.lastrowid
             if contact_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_primary_key_from(table='Contacts',
-                                                                    columns=['first_name', 'last_name']), (first_name, last_name))
+                c.execute(self.sql_requests.select_primary_key_from(table=DBConstants.CONTACTS_TABLE,
+                                                                    columns=DBConstants.CONTACTS_COLUMNS),
+                          (first_name, last_name))
                 contact_id = c.fetchone()[0]
             return contact_id
 
@@ -43,12 +46,13 @@ class EmailDatabase:
         alias = self.string_cleaner.to_lower_and_strip(alias)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert(table='Alias',
-                                               columns=['alias']), (alias,))
+            c.execute(self.sql_requests.insert(table=DBConstants.ALIAS_TABLE,
+                                               columns=DBConstants.ALIAS_COLUMNS), (alias,))
             alias_id = c.lastrowid
             if alias_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_primary_key_from(table='Alias',
-                                                                    columns=['alias']), (alias,))
+                c.execute(self.sql_requests.select_primary_key_from(table=DBConstants.ALIAS_TABLE,
+                                                                    columns=DBConstants.ALIAS_COLUMNS),
+                          (alias,))
                 alias_id = c.fetchone()[0]
             return alias_id
 
@@ -57,12 +61,14 @@ class EmailDatabase:
         email_address = self.string_cleaner.to_lower_and_strip(email_address)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert(table='EmailAddresses',
-                                               columns=['email_address']), (email_address,))
+            c.execute(self.sql_requests.insert(table=DBConstants.EMAIL_ADDRESSES_TABLE,
+                                               columns=DBConstants.EMAIL_ADDRESSES_COLUMNS)
+                      , (email_address,))
             address_id = c.lastrowid
             if address_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_primary_key_from(table='EmailAddresses',
-                                                                    columns=['email_address']), (email_address,))
+                c.execute(self.sql_requests.select_primary_key_from(table=DBConstants.EMAIL_ADDRESSES_TABLE,
+                                                                    columns=DBConstants.EMAIL_ADDRESSES_COLUMNS)
+                          , (email_address,))
                 address_id = c.fetchone()[0]
             return address_id
 
@@ -70,8 +76,8 @@ class EmailDatabase:
         log_email_database.info(f"Func: insert_email")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert(table='Emails',
-                                               columns=['id', 'filepath', 'filename', 'subject', 'body'])
+            c.execute(self.sql_requests.insert(table=DBConstants.EMAILS_TABLE,
+                                               columns=DBConstants.EMAILS_COLUMNS)
                       , (id, filepath, filename, subject, body))
             conn.commit()
             return id
@@ -80,12 +86,13 @@ class EmailDatabase:
         #log_email_database.info(f"Func: insert_date")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert(table='Date',
-                                               columns=['date']), (date,))
+            c.execute(self.sql_requests.insert(table=DBConstants.DATE_TABLE,
+                                               columns=DBConstants.DATE_COLUMNS), (date,))
             date_id = c.lastrowid
             if date_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_primary_key_from(table='Date',
-                                                                    columns=['date']), (date,))
+                c.execute(self.sql_requests.select_primary_key_from(table=DBConstants.DATE_TABLE,
+                                                                    columns=DBConstants.DATE_COLUMNS)
+                          , (date,))
                 date_id = c.fetchone()[0]
             return date_id
 
@@ -93,12 +100,13 @@ class EmailDatabase:
         #log_email_database.info(f"Func: insert_timestamp")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert(table='Timestamp',
-                                               columns=['timestamp']), (timestamp,))
+            c.execute(self.sql_requests.insert(table=DBConstants.TIMESTAMP_TABLE,
+                                               columns=DBConstants.TIMESTAMP_COLUMNS), (timestamp,))
             timestamp_id = c.lastrowid
             if timestamp_id == 0 and return_existing_id:
-                c.execute(self.sql_requests.select_primary_key_from(table='Timestamp',
-                                                                    columns=['timestamp']), (timestamp,))
+                c.execute(self.sql_requests.select_primary_key_from(table=DBConstants.TIMESTAMP_TABLE,
+                                                                    columns=DBConstants.TIMESTAMP_COLUMNS)
+                          , (timestamp,))
                 timestamp_id = c.fetchone()[0]
             return timestamp_id
 
@@ -106,8 +114,8 @@ class EmailDatabase:
         log_email_database.info(f"Func: insert_attachment")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute(self.sql_requests.insert(table='Attachments',
-                                               columns=['id', 'filename', 'content', 'extracted_text'])
+            c.execute(self.sql_requests.insert(table=DBConstants.ATTACHMENTS_TABLE,
+                                               columns=DBConstants.ATTACHMENTS_COLUMNS)
                       , (id, filename, content, extracted_text))
             conn.commit()
             return id

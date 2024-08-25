@@ -7,7 +7,7 @@ from .iemail_parser import IEmailParser
 from utils.string_cleaner import StringCleaner
 from utils.date_transformer import DateTransformer
 from hasher.hasher import Hasher
-from utils.log import log_email_parser
+from utils.logging_setup import log_email_parser
 
 class EmailParser(IEmailParser):
     def __init__(self, hasher: Hasher, string_cleaner=None, date_transformer=None):
@@ -29,10 +29,12 @@ class EmailParser(IEmailParser):
         msg = BytesParser(policy=policy.default).parsebytes(email_content)
         # print(f"msg keys: {msg.keys()}")
         email_id = self.hasher.hash_string(data=msg.as_bytes())
-        #print(f"email_id: {email_id}")
-        body, attachments = self.extract_body_and_attachments(msg=msg)
+        log_email_parser.debug(f"Func: parse_email for email_id: {email_id}")
         # print(f"Date: {msg['date']}")
         date = self._transform_date(msg['date'])
+        log_email_parser.debug(f"Func: parse_email with date: {date}")
+        body, attachments = self.extract_body_and_attachments(msg=msg)
+
 
         from_name, from_address = self._parse_names_addresses(data=msg['from'])
         to_names, to_addresses = self._parse_names_addresses(data=msg['to'])
@@ -88,11 +90,20 @@ class EmailParser(IEmailParser):
             elif content_disposition is None:
                 # This is the email body
                 if part.get_content_type() in ["text/plain", "text/html"]:
-                    charset = part.get_content_charset() or 'utf-8'  # Default to 'utf-8' if charset is Non
-                    try:
-                        body_content = part.get_payload(decode=True).decode(charset)
-                    except UnicodeDecodeError:
+                    charset = part.get_content_charset()
+                    if charset:
+                        try:
+                            # Attempt to decode with the specified charset
+                            body_content = part.get_payload(decode=True).decode(charset)
+                        except (LookupError, UnicodeDecodeError):
+                            # Fallback to utf-8 if charset is unknown or decoding fails
+                            log_email_parser.warning(
+                                f"Unknown or invalid charset '{charset}', falling back to 'utf-8'.")
+                            body_content = part.get_payload(decode=True).decode('utf-8', errors='replace')
+                    else:
+                        # No charset specified, default to utf-8
                         body_content = part.get_payload(decode=True).decode('utf-8', errors='replace')
+
                     if part.get_content_type() == "text/plain" or body is None:
                         body = body_content
 
@@ -103,6 +114,7 @@ class EmailParser(IEmailParser):
                 content = part.get_payload(decode=True)
                 if content is not None:
                     attachment_id = self.hasher.hash_string(data=content)
+                    log_email_parser.debug(f"Func: extract_body_and_attachments, attachment_id: {attachment_id}")
                     self._download_attachment(content=content, attachment_id=attachment_id, filename=filename)
                     # ToDo !!!
                     #extractor = AttachmentTextExtractor(file_content=content)

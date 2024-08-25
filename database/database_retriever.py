@@ -1,8 +1,9 @@
 import sqlite3
 from database.sql_request import SQLRequest
 from utils.date_transformer import DateTransformer
+from config.db_constants import DBConstants
 class DatabaseRetriever:
-    def __init__(self, db_name='database.db', **kwargs):
+    def __init__(self, db_name=DBConstants.db_name, **kwargs):
         """
         : contacts: filtering on specific contacts
         : aliases: filtering on specific aliases
@@ -20,7 +21,7 @@ class DatabaseRetriever:
 
         self.db_name = db_name
         self.params = kwargs
-        self.valid_localization = ['everywhere', 'contact', 'alias', 'address', 'subject', 'body', 'attachment_name', 'attachment']
+        self.valid_localization = DBConstants.KEYWORD_SEARCH_FIELDS
         self.words_localization_control()
         self.date_to_timestamp()
 

@@ -1,16 +1,11 @@
-from constants import SystemConfig
-from hasher.ihashable import IHasher
+from config.system_config import SystemConfig
 from aggregator.file_retriever import FileRetriever
 from parser.email_parser import EmailParser
 from database.email_database import EmailDatabase
-from utils.system_monitor import SystemMonitor
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import sys
 import os
-import psutil
-import mailbox
-from utils.log import log_email_aggregator
+from utils.logging_setup import log_email_aggregator
 from aggregator.mbox_extractor import MboxExtractor
 from queue import Queue
 from threading import Thread
@@ -52,6 +47,7 @@ class EmailAggregator:
             self.process_mbox_file(mbox_file=mbox_file)
 
     def process_mbox_file(self, mbox_file):
+        log_email_aggregator.debug(f"Func: process_mbox_file, for mbox_file: {mbox_file}")
         mbe = MboxExtractor(mbox_file_path=mbox_file, temp_dir=self.temp_dir_name)
         temp_paths = mbe.extract_emails()
         self.process_email_files(email_files=temp_paths)

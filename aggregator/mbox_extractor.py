@@ -1,14 +1,6 @@
 import os
 import tempfile
-import mailbox
-from tqdm import tqdm
-import sys
-import email
-from email.parser import BytesParser
-from email.policy import default
-from typing import Callable
-from utils.log import log_mbox_extractor
-import multiprocessing as mp
+from utils.logging_setup import log_mbox_extractor
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
