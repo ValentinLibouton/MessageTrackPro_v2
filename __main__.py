@@ -35,12 +35,7 @@ def create_and_fill_database():
 
 def retrieve():
     from database.database_retriever import DatabaseRetriever
-
-    # db_retriever = DatabaseRetriever(words=['libouton.valentin@protonmail.ch'],
-    #                                  words_localization=['everywhere'],  # 'address'],
-    #                                  word_operator="OR",
-    #                                  start_date="2018-10-17 00:00:00")
-    db_retriever = DatabaseRetriever(addresses=['libouton.valentin@protonmail.ch'])
+    db_retriever = DatabaseRetriever(addresses=['libouton.valentin'])
 
     # Build the query with joins and where conditions
     db_retriever.join().where()
