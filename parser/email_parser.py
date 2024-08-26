@@ -8,12 +8,17 @@ from utils.string_cleaner import StringCleaner
 from utils.date_transformer import DateTransformer
 from hasher.hasher import Hasher
 from utils.logging_setup import log_email_parser
+from config.email_parser_constants import EmailParserConstants
 
 class EmailParser(IEmailParser):
-    def __init__(self, hasher: Hasher, string_cleaner=None, date_transformer=None):
-        self.sc = string_cleaner if string_cleaner else StringCleaner()
-        self.dt = date_transformer if date_transformer else DateTransformer()
-        self.hasher = hasher
+    def __init__(self, attachments_directory=None):
+        self.sc = StringCleaner()
+        self.dt = DateTransformer()
+        self.hasher = Hasher()
+        if attachments_directory:
+            self.attachments_directory = attachments_directory
+        else:
+            self.attachments_directory = EmailParserConstants.ATTACHMENTS_DIRECTORY
 
     def parse_email(self, email_content):
         """

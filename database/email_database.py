@@ -93,7 +93,11 @@ class EmailDatabase:
                 c.execute(self.sql_requests.select_primary_key_from(table=DBConstants.DATE_TABLE,
                                                                     columns=DBConstants.DATE_COLUMNS)
                           , (date,))
-                date_id = c.fetchone()[0]
+                row = c.fetchone()
+                if row is not None:
+                    date_id = row[0]
+                else:
+                    return None
             return date_id
 
     def insert_timestamp(self, timestamp, return_existing_id=False):
@@ -107,8 +111,13 @@ class EmailDatabase:
                 c.execute(self.sql_requests.select_primary_key_from(table=DBConstants.TIMESTAMP_TABLE,
                                                                     columns=DBConstants.TIMESTAMP_COLUMNS)
                           , (timestamp,))
-                timestamp_id = c.fetchone()[0]
+                row = c.fetchone()
+                if row is not None:
+                    timestamp_id = row[0]
+                else:
+                    return None
             return timestamp_id
+
 
     def insert_attachment(self, id, filename, content, extracted_text, return_existing_id=False):
         log_email_database.info(f"Func: insert_attachment")

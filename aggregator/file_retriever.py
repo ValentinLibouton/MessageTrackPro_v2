@@ -4,11 +4,11 @@ from aggregator.ifile_retriever import IFileRetriever
 from utils.logging_setup import log_file_retriever
 
 class FileRetriever(IFileRetriever):
-    def __init__(self, path, supported_extensions, file_detector_class=FileDetector):
+    def __init__(self, path, supported_extensions):
         self.__path = path
         self.__supported_extensions = supported_extensions
         self.__filepath_dict = {}
-        self.file_detector_class = file_detector_class
+        self.file_detector = FileDetector
 
     def retrieve_files_path(self):
         log_file_retriever.info("Func: retrieve_files_path")
@@ -31,7 +31,7 @@ class FileRetriever(IFileRetriever):
             file_path = os.path.join(root, file)
 
         #print(f"Analyse du fichier : {file_path}")
-        detector = self.file_detector_class(file_path)
+        detector = self.file_detector(file_path)
         file_type = detector.detect()
 
         if file_type == 'email':

@@ -9,6 +9,7 @@ from utils.logging_setup import log_email_aggregator
 from aggregator.mbox_extractor import MboxExtractor
 from queue import Queue
 from threading import Thread
+from utils.string_cleaner import StringCleaner
 
 
 class EmailAggregator:
@@ -18,6 +19,7 @@ class EmailAggregator:
                  mbox_temp_directory: str = None,
                  with_attachments: bool = False,
                  delete_temp_files: bool = False):
+        self.sc = StringCleaner()
         self.temp_dir_name = None
         self._file_retriever = file_retriever
         self._ep = email_parser
@@ -43,7 +45,8 @@ class EmailAggregator:
 
     def process_mbox_files(self, mbox_list):
         for i, mbox_file in enumerate(mbox_list):
-            self.create_temp_dir(temp_dir=self.mbox_temp_directory, sub_dir_name=f"mbox_temp_{i + 1}")
+            mbox_file_name = self.sc.get_filename_from_path(path=mbox_file, remove_extension_file=True)
+            self.create_temp_dir(temp_dir=self.mbox_temp_directory, sub_dir_name=f"{mbox_file_name}_{i + 1}")
             self.process_mbox_file(mbox_file=mbox_file)
 
     def process_mbox_file(self, mbox_file):
@@ -134,12 +137,14 @@ class EmailAggregator:
                       value_1=email_id, value_2=id_bcc)
 
         date_str_id = self._db.insert_date(date=email['date_str'], return_existing_id=True)
-        self._db.link(table='Email_Date', col_name_1='email_id', col_name_2='date_id',
-                      value_1=email_id, value_2=date_str_id)
+        if date_str_id:
+            self._db.link(table='Email_Date', col_name_1='email_id', col_name_2='date_id',
+                          value_1=email_id, value_2=date_str_id)
 
         timestamp_id = self._db.insert_timestamp(timestamp=email['timestamp'], return_existing_id=True)
-        self._db.link(table='Email_Timestamp', col_name_1='email_id', col_name_2='timestamp_id',
-                      value_1=email_id, value_2=timestamp_id)
+        if timestamp_id:
+            self._db.link(table='Email_Timestamp', col_name_1='email_id', col_name_2='timestamp_id',
+                          value_1=email_id, value_2=timestamp_id)
 
         for attachment in email['attachments']:
             attachment_id = attachment['attachment_id']

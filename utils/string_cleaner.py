@@ -1,3 +1,5 @@
+import os.path
+
 from .istring_cleaner import IStringCleaner
 class StringCleaner(IStringCleaner):
     def __init__(self, exclude_chars=None):
@@ -79,3 +81,63 @@ class StringCleaner(IStringCleaner):
         else:
             new_filename = self.remove_chars(data=new_name, exclude_chars=self.forbidden_chars_in_file_names)
         return new_filename
+
+    def get_filename_without_extension(self, filename: str) -> str:
+        """
+        Returns the filename without its extension.
+
+        :param filename: The full filename with extension.
+        :return: Filename without the extension.
+        """
+        dot_index = filename.rfind('.')
+        if dot_index == -1:
+            return filename
+        return filename[:dot_index]
+
+    def get_filename_from_path(self, path: str, remove_extension_file: bool = False) -> str:
+        """
+        Returns the filename from a full file path. Optionally removes the file extension.
+
+        :param path: The full file path.
+        :param remove_extension_file: If True, the extension will be removed from the filename.
+        :return: Filename, with or without extension based on the argument.
+        """
+        filename = os.path.basename(path)
+        if remove_extension_file:
+            filename = self.get_filename_without_extension(filename=filename)
+        return filename
+
+    def get_dirname_from_path(self, path: str) -> str:
+        if os.path.isdir(path):
+            return os.path.basename(os.path.normpath(path))
+        return None
+
+    def is_file(self, path: str) -> bool:
+        """
+        Returns True if the path is a file, False otherwise.
+
+        :param path: The full path to check.
+        :return: Boolean indicating whether the path is a file.
+        """
+        return os.path.isfile(path)
+
+    def is_dir(self, path: str) -> bool:
+        """
+        Returns True if the path is a directory, False otherwise.
+
+        :param path: The full path to check.
+        :return: Boolean indicating whether the path is a directory.
+        """
+        return os.path.isdir(path)
+
+    def create_directory(self, dir_path: str):
+        """
+        Creates a directory if it does not already exist.
+
+        :param dir_path: The path of the directory to create.
+        """
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+            print(f"Directory '{dir_path}' created.")
+        else:
+            print(f"Directory '{dir_path}' already exists.")

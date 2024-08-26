@@ -1,6 +1,8 @@
-import logging
+from config.log_constants import LogConstants
 from utils.logger_manager import LoggerManager
+from utils.string_cleaner import StringCleaner
 
+sc = StringCleaner().create_directory(dir_path=LogConstants.LOG_PATH)
 log_manager = LoggerManager()
 
 

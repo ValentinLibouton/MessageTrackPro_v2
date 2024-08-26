@@ -1,10 +1,9 @@
-from hasher.hasher import Hasher
 from aggregator.email_aggregator import EmailAggregator
 from aggregator.file_retriever import FileRetriever
-from aggregator.file_detector import FileDetector
 from parser.email_parser import EmailParser
 from database.email_database import EmailDatabase
 import os
+from config.file_constants import FileConstants
 
 def paths_to_dict():
     """This is a temporary function for project development..."""
@@ -20,14 +19,10 @@ def paths_to_dict():
 def create_and_fill_database():
     #path = paths_to_dict()['emails_eml']
     path = paths_to_dict()['all_emails']
-    #print(path)
-    hasher = Hasher()
-    supported_extensions = ['.outlook.com', '.eml', '.mbox', '.msg', '.pst', '.ost', '.oft', '.olm']
-    file_retriever = FileRetriever(path=path, supported_extensions=supported_extensions,
-                                   file_detector_class=FileDetector)
-    email_parser = EmailParser(hasher=hasher)
-    # file_retriever.retrieve_files_path()
-    # print(file_retriever.filepath_dict)
+
+    file_retriever = FileRetriever(path=path, supported_extensions=FileConstants.SUPPORTED_EMAIL_EXTENSIONS)
+    attachments_path = paths_to_dict()['attachments']
+    email_parser = EmailParser(attachments_directory=attachments_path)
     email_database = EmailDatabase()
     mbox_temp_directory = paths_to_dict()['tmp']
     aggregator = EmailAggregator(file_retriever=file_retriever, email_parser=email_parser,
