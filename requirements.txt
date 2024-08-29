@@ -11,3 +11,5 @@ patool
 py7zr
 vobject
 python-gnupg
+odfpy
+openpyxl
