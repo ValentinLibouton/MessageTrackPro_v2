@@ -9,6 +9,11 @@ import tempfile
 import vobject
 import gnupg
 from io import BytesIO
+from bs4 import BeautifulSoup
+from odf.opendocument import load
+from odf.text import P
+from openpyxl import load_workbook
+
 
 class FileTextExtractor:
     def __init__(self, file_path=None, content=None):
@@ -30,30 +35,40 @@ class FileTextExtractor:
         elif self.content:
             self.file_mime_type = mime.from_buffer(self.content)
     def extract_text(self):
-        if self.file_mime_type == 'application/pdf':
-            return self._extract_text_from_pdf()
-        elif self.file_mime_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-            return self._extract_text_from_docx()
-        elif self.file_mime_type == 'application/msword':
-            return self._extract_text_from_doc()
-        elif self.file_mime_type == 'text/plain':
-            return self._extract_text_from_txt()
-        elif self.file_mime_type in ['text/vcard', 'text/x-vcard']:
-            # ToDo: implementation to be revised !!!
-            return self._extract_text_from_vcf()
-        elif 'image' in self.file_mime_type:
-            print("Image extension detected")
-        elif 'video' in self.file_mime_type:
-            print("Video extension detected")
-        elif self._is_archive(self.file_mime_type):
-            return self._extract_from_archive()
-        elif self.file_mime_type == 'application/pgp-keys':
-            return self._extract_text_from_pgp_key()
-        elif self.file_mime_type == 'application/pgp-encrypted':
-            return self._decrypt_pgp_encrypted_file()
-        else:
-            # raise ValueError(f"Unsupported file type: {file_extension}")
-            raise ValueError(f"Unsupported file type: {self.file_mime_type}")
+        match self.file_mime_type:
+            case 'application/pdf':
+                return self._extract_text_from_pdf()
+            case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                return self._extract_text_from_docx()
+            case 'application/msword':
+                return self._extract_text_from_doc()
+            case 'application/vnd.oasis.opendocument.text':
+                return self._extract_text_from_odt()
+            case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+                return self._extract_text_from_excel()
+            case 'text/plain' | 'text/x-shellscript':
+                return self._extract_text_from_txt()
+            case 'text/html':
+                return self._extract_text_from_html()
+            case 'text/vcard' | 'text/x-vcard':
+                return self._extract_text_from_vcf()
+            case 'text/calendar':
+                return self._extract_text_from_calendar()
+            case 'inode/x-empty':
+                print("Empty file detected. No content to extract.")
+                return ""
+            case mime if 'image' in mime:
+                print("Image extension detected")
+            case mime if 'video' in mime:
+                print("Video extension detected")
+            case mime if self._is_archive(mime):
+                return self._extract_from_archive()
+            case 'application/pgp-keys':
+                return self._extract_text_from_pgp_key()
+            case 'application/pgp-encrypted':
+                return self._decrypt_pgp_encrypted_file()
+            case _:
+                raise ValueError(f"Unsupported file type: {self.file_mime_type}")
 
     def _is_archive(self, mime_type):
         # Les types MIME pour les archives
@@ -140,6 +155,34 @@ class FileTextExtractor:
                 os.remove(temp_file.name)
                 return text
 
+    def _extract_text_from_odt(self):
+        """
+        Extracts text content from an ODT file (OpenDocument Text).
+        """
+        try:
+            doc = load(self.file_path)
+            paragraphs = []
+            for element in doc.getElementsByType(P):
+                paragraphs.append(str(element))
+
+            return "\n".join(paragraphs)
+        except Exception as e:
+            print(f"Error processing ODT file: {e}")
+            return ""
+
+    def _extract_text_from_excel(self):
+        text = ""
+        if self.file_path:
+            workbook = load_workbook(filename=self.file_path, data_only=True)
+        else:
+            workbook = load_workbook(filename=BytesIO(self.content), data_only=True)
+
+        for sheet in workbook.worksheets:
+            for row in sheet.iter_rows(values_only=True):
+                row_text = "\t".join([str(cell) if cell is not None else "" for cell in row])
+                text += row_text + "\n"
+        return text
+
     def _extract_text_from_txt(self):
         if self.file_path:
             with open(self.file_path, 'r', encoding='utf-8') as file:
@@ -147,6 +190,24 @@ class FileTextExtractor:
         elif self.content:
             text = self.content.decode('utf-8')
         return text
+
+    def _extract_text_from_html(self):
+        """
+        Extracts text content from an HTML file (text/html).
+        """
+        try:
+            if self.file_path:
+                with open(self.file_path, 'r', encoding='utf-8') as file:
+                    html_content = file.read()
+            elif self.content:
+                html_content = self.content.decode('utf-8')
+
+            soup = BeautifulSoup(html_content, 'html.parser')
+            return soup.get_text(separator='\n', strip=True)
+
+        except Exception as e:
+            print(f"Error processing HTML file: {e}")
+            return ""
 
     def _extract_text_from_pgp_key(self):
         if self.file_path:
@@ -209,6 +270,29 @@ class FileTextExtractor:
             vcf_source.close()
 
         return "\n".join(contacts_info)
+
+    def _extract_text_from_calendar(self):
+        """
+        Extracts text content from a calendar file (text/calendar).
+        """
+        try:
+            if self.file_path:
+                with open(self.file_path, 'r') as file:
+                    calendar_data = file.read()
+            elif self.content:
+                calendar_data = self.content.decode('utf-8')
+
+            calendar = vobject.readOne(calendar_data)
+            extracted_text = []
+            for component in calendar.components():
+                for name, prop in component.contents.items():
+                    extracted_text.append(f"{name}: {prop[0].value}")
+
+            return "\n".join(extracted_text)
+
+        except Exception as e:
+            print(f"Error processing calendar file: {e}")
+            return ""
 
 
 if __name__ == "__main__":

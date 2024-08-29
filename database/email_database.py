@@ -6,7 +6,7 @@ from config.db_constants import DBConstants
 
 
 class EmailDatabase:
-    def __init__(self, db_name=DBConstants.db_name, sql_file=DBConstants.sql_name, string_cleaner=None, sql_requests=None):
+    def __init__(self, db_name=DBConstants.DB_NAME, sql_file=DBConstants.SQL_NAME, string_cleaner=None, sql_requests=None):
         self.string_cleaner = string_cleaner if string_cleaner else StringCleaner()
         self.db_name = db_name
         self.sql_file = sql_file

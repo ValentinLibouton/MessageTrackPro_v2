@@ -3,7 +3,7 @@ from database.sql_request import SQLRequest
 from utils.date_transformer import DateTransformer
 from config.db_constants import DBConstants
 class DatabaseRetriever:
-    def __init__(self, db_name=DBConstants.db_name, **kwargs):
+    def __init__(self, db_name=DBConstants.DB_NAME, **kwargs):
         """
         : contacts: filtering on specific contacts
         : aliases: filtering on specific aliases

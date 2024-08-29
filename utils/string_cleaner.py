@@ -141,3 +141,12 @@ class StringCleaner(IStringCleaner):
             print(f"Directory '{dir_path}' created.")
         else:
             print(f"Directory '{dir_path}' already exists.")
+
+    def file_exists(self, path: str) -> bool:
+        """
+        Checks if the file exists at the specified path.
+
+        :param path: The full path to check.
+        :return: True if the file exists, False otherwise.
+        """
+        return os.path.isfile(path)

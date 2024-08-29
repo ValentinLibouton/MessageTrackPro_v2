@@ -20,13 +20,13 @@ def create_and_fill_database():
     #path = paths_to_dict()['emails_eml']
     path = paths_to_dict()['all_emails']
 
-    file_retriever = FileRetriever(path=path, supported_extensions=FileConstants.SUPPORTED_EMAIL_EXTENSIONS)
+    file_retriever = FileRetriever(path=path)
     attachments_path = paths_to_dict()['attachments']
     email_parser = EmailParser(attachments_directory=attachments_path)
     email_database = EmailDatabase()
     mbox_temp_directory = paths_to_dict()['tmp']
     aggregator = EmailAggregator(file_retriever=file_retriever, email_parser=email_parser,
-                                 email_database=email_database, mbox_temp_directory=mbox_temp_directory)
+                                 email_database=email_database, temp_eml_storage_dir=mbox_temp_directory)
 
 def retrieve():
     from database.database_retriever import DatabaseRetriever
