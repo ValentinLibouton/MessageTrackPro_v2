@@ -1,8 +1,19 @@
+class DatabaseRetrieverConstants:
+    """For DatabaseRetriever class"""
+    WORDS_LOCALIZATION: str = 'words_localization'
+    KEYWORD_SEARCH_FIELDS: list[str] = ['everywhere', 'contact', 'alias', 'address', 'subject', 'body',
+                                        'attachment_name', 'attachment']
+    EVERYWHERE_LOCALISATION: str = 'everywhere'
+    DEFAULT_WORD_OPERATOR: str = 'OR'
+    START_DATE: str = 'start_date'
+    END_DATE: str = 'end_date'
+
 class DBConstants:
     DB_NAME: str = 'database.db'
     SQL_NAME: str = 'database/database.sql'
-    KEYWORD_SEARCH_FIELDS: list[str] = ['everywhere', 'contact', 'alias', 'address', 'subject', 'body',
-                                        'attachment_name', 'attachment']
+
+
+
 
     # CONTACTS
     CONTACTS_TABLE: str = 'Contacts'
