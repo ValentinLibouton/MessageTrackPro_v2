@@ -28,3 +28,14 @@ _____________________________________________________________________
 
 ## Messenger managment (Facebook)
 - [ ] *not yet implemented*
+
+_____________________________________________________________________
+# Docs
+## Tables
+![Table](images/Tables.png)
+
+## Join
+![Join](images/Joins.png)
+
+## Where
+![Where](images/Where.png)

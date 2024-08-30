@@ -3,3 +3,15 @@ jupyter
 tabulate
 polars
 tqdm
+python-docx
+PyPDF2
+pymupdf
+textract
+python-magic
+patool
+py7zr
+vobject
+python-gnupg
+odfpy
+openpyxl
+striprtf

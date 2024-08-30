@@ -1,0 +1,25 @@
+EMAIL_ID = 'email_id'
+FROM_NAME = 'from_name'
+FROM_ADDRESS = 'from_address'
+SUBJECT = 'subject'
+DATE_STR = 'date_str'
+DATE_OBJ = 'date_obj'
+DATE_ISO = 'date_iso'
+TIMESTAMP = 'timestamp'
+TO_NAMES = 'to_names'
+TO_ADDRESSES = 'to_addresses'
+CC_NAMES = 'cc_names'
+CC_ADDRESSES = 'cc_addresses'
+BCC_NAMES = 'bcc_names'
+BCC_ADDRESSES = 'bcc_addresses'
+BODY = 'body'
+ATTACHMENTS = 'attachments'
+
+ATTACHMENT_ID = 'attachment_id'
+ATTACHMENT_FILENAME = 'filename'
+ATTACHMENT_CONTENT = 'content'
+ATTACHMENT_EXTRACTED_TEXT = 'extracted_text'
+
+ALL_NAMES = [FROM_NAME, TO_NAMES, CC_NAMES, BCC_NAMES]
+
+DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'

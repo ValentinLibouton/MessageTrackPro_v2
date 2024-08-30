@@ -13,15 +13,15 @@ class TestFileDetector(unittest.TestCase):
 
     def test_detect_email(self):
         detector = FileDetector("test_email.eml")
-        self.assertEqual(detector.detect(), 'email')
+        self.assertEqual(detector.detect_type(), 'email')
 
     def test_detect_mbox(self):
         detector = FileDetector("test_mbox.mbox")
-        self.assertEqual(detector.detect(), 'mbox')
+        self.assertEqual(detector.detect_type(), 'mbox')
 
     def test_detect_unknown(self):
         detector = FileDetector("unknown_file.txt")
-        self.assertEqual(detector.detect(), 'unknown')
+        self.assertEqual(detector.detect_type(), 'unknown')
 
 if __name__ == '__main__':
     unittest.main()

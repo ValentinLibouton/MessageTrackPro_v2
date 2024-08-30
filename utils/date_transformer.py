@@ -108,6 +108,8 @@ class DateTransformer(IDateTransformer):
 
 
     def change_time_shift(self, date_input: datetime):
+        if date_input is None:
+            return None
         if date_input.tzinfo is None:
             date_input = pytz.timezone(self.timezone_name).localize(date_input)
 
@@ -161,3 +163,11 @@ class DateTransformer(IDateTransformer):
                 date_input = date_input + timedelta(seconds=offset + season_offset)
 
         return date_input.astimezone(pytz.timezone(self.timezone_name))
+
+    def convert_to_timestamp(self, date_string: str) -> int:
+        dt = datetime.strptime(date_string, '%Y-%m-%d %H:%M:%S')
+
+        # Convertir l'objet datetime en timestamp
+        timestamp = int(dt.timestamp())
+
+        return timestamp

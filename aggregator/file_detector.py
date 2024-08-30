@@ -1,37 +1,34 @@
-import os
-import sys
-
 from aggregator.ifile_detector import IFileDetector
+from config.file_constants import FileConstants
 
 
 class FileDetector(IFileDetector):
-    EMAIL_EXTENSIONS = ('.eml', '.outlook.com', '.msg', '.pst', '.ost', '.oft', '.olm')
-
-    def __init__(self, file_path):
+    def __init__(self, file_path, perform_content_check=False):
         self.file_path = file_path
+        self.perform_content_check = perform_content_check
 
     def is_email(self) -> bool:
-        return self.file_path.lower().endswith(self.EMAIL_EXTENSIONS)
+        return self.file_path.lower().endswith(FileConstants.EMAIL_EXTENSIONS)
 
     def is_mbox(self) -> bool:
-        if self.file_path.endswith('.mbox'):
+        if self.file_path.endswith(FileConstants.MBOX_EXTENSION):
             return True
 
-        # Vérification supplémentaire en lisant le contenu
-        try:
-            with open(self.file_path, 'r', errors='ignore') as f:
-                for line in f:
-                    if line.startswith('From '):
-                        return True
-        except:
-            pass
-
+        # Additional check by reading the content, if enabled
+        if self.perform_content_check:
+            try:
+                with open(self.file_path, 'r', errors='ignore') as f:
+                    for line in f:
+                        if line.startswith(FileConstants.MBOX_START_LINE):
+                            return True
+            except:
+                pass
         return False
 
-    def detect(self) -> str:
+    def detect_type(self) -> str:
         if self.is_email():
-            return 'email'
+            return FileConstants.EMAIL_TYPE
         elif self.is_mbox():
-            return 'mbox'
+            return FileConstants.MBOX_TYPE
         else:
-            return 'unknown'
+            return FileConstants.UNKNOWN_TYPE
