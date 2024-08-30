@@ -8,12 +8,12 @@ from typing import Optional, Tuple, List, Dict, Union, Any
 
 from config.email_parser_constants import EmailParserConstants
 from config.email_constants import *
-from utils.file_text_extractor import FileTextExtractor
+from utils.file_content_extractor import FileContentExtractor
 
 from .iemail_parser import IEmailParser
 from utils.string_cleaner import StringCleaner
 from utils.date_transformer import DateTransformer
-from utils.logging_setup import log_email_parser
+from utils.logging_setup import log_email_parser_info, log_email_parser_debug, log_email_parser_warning
 from hasher.hasher import Hasher
 
 
@@ -37,18 +37,22 @@ class EmailParser(IEmailParser):
         Retourne:
         dict: Un dictionnaire contenant les données de l'email.
         """
-        log_email_parser.info("Func: parse_email")
+        log_email_parser_info.info("Func: parse_email")
         msg = BytesParser(policy=policy.default).parsebytes(email_content)
         email_id = self.hasher.hash_string(data=msg.as_bytes())
-        log_email_parser.debug(f"Func: parse_email for email_id: {email_id}")
+        log_email_parser_debug.debug(f"Func: parse_email for email_id: {email_id}")
         date = self._transform_date(msg['date'])
-        log_email_parser.debug(f"Func: parse_email with date: {date}")
+        log_email_parser_debug.debug(f"Func: parse_email with date: {date}")
         body, attachments = self.extract_body_and_attachments(msg=msg)
 
         from_name, from_address = self._parse_names_addresses(data=msg['from'])
         to_names, to_addresses = self._parse_names_addresses(data=msg['to'])
         cc_names, cc_addresses = self._parse_names_addresses(data=msg['cc'])
         bcc_names, bcc_addresses = self._parse_names_addresses(data=msg['bcc'])
+        log_email_parser_debug.debug(f"from_name: {from_name}")
+        log_email_parser_debug.debug(f"to_names: {to_names}")
+        log_email_parser_debug.debug(f"cc_names: {cc_names}")
+        log_email_parser_debug.debug(f"bcc_names: {bcc_names}")
 
         return {
             EMAIL_ID: email_id,
@@ -70,7 +74,7 @@ class EmailParser(IEmailParser):
         }
 
     def extract_body_and_attachments(self, msg: BytesParser) -> Tuple[Optional[str], List[Dict[str, Union[str, bytes]]]]:
-        log_email_parser.info("Func: extract_body_and_attachments")
+        log_email_parser_info.info("Func: extract_body_and_attachments")
         body = None
         attachments = []
         for part in msg.walk():
@@ -87,7 +91,7 @@ class EmailParser(IEmailParser):
                             body_content = part.get_payload(decode=True).decode(charset)
                         except (LookupError, UnicodeDecodeError):
                             # Fallback to utf-8 if charset is unknown or decoding fails
-                            log_email_parser.warning(
+                            log_email_parser_warning.warning(
                                 f"Unknown or invalid charset '{charset}', falling back to 'utf-8'.")
                             body_content = part.get_payload(decode=True).decode('utf-8', errors='replace')
                     else:
@@ -98,15 +102,15 @@ class EmailParser(IEmailParser):
                         body = body_content
 
             elif "attachment" in content_disposition:
-                log_email_parser.info("Func: extract_body_and_attachments, attachment found.")
+                log_email_parser_info.info("Func: extract_body_and_attachments, attachment found.")
                 # This is an attachment
                 filename = part.get_filename()
                 content = part.get_payload(decode=True)
                 if content is not None:
                     attachment_id = self.hasher.hash_string(data=content)
-                    log_email_parser.debug(f"Func: extract_body_and_attachments, attachment_id: {attachment_id}")
+                    log_email_parser_debug.debug(f"Func: extract_body_and_attachments, attachment_id: {attachment_id}")
                     filepath = self._download_attachment(content=content, attachment_id=attachment_id, filename=filename)
-                    file_text_extractor = FileTextExtractor(file_path=filepath)
+                    file_text_extractor = FileContentExtractor(file_path=filepath)
                     extracted_text = file_text_extractor.extract_text()
                     attachments.append({
                         'attachment_id': attachment_id,
@@ -127,24 +131,24 @@ class EmailParser(IEmailParser):
             new_filename = self.sc.rename_file(filename=filename, new_name=attachment_id)
             filepath = os.path.join(self.attachments_directory, new_filename)
             if not self.sc.file_exists(filepath):
-                log_email_parser.info(f"Download attachment {filepath}")
+                log_email_parser_info.info(f"Download attachment {filepath}")
                 with open(filepath, 'wb') as f:
                     f.write(content)
             else:
-                log_email_parser.debug(f"Attachment {filename} already exists")
+                log_email_parser_debug.debug(f"Attachment {filename} already exists")
             return filepath
         except Exception as e:
             raise Exception(f"{filename}: {e}")
 
     def _parse_names_addresses(self, data: str) -> Tuple[List[str], List[str]]:
-        # log_email_parser.info("Func: _parse_names_addresses")
+        log_email_parser_debug.debug(f"Func: _parse_names_addresses {data}")
         list_names_and_addresses = self.split_name_address(fieldvalue=data)
         names, addresses = self.separate_names_and_addresses_from_list(list_names_and_addresses)
         names = self.sc.replace_chars_by_char(data=names, current_chars={'.'}, new_char=' ')
         return names, addresses
 
     def _transform_date(self, date_input: str) -> datetime:
-        # log_email_parser.info("Func: _transform_date")
+        log_email_parser_debug.debug(f"Func: _transform_date {date_input}")
         date_obj = self.dt.parse_email_date(date_input=date_input)
         date_obj = self.dt.change_time_shift(date_input=date_obj)
         return date_obj
@@ -157,7 +161,7 @@ class EmailParser(IEmailParser):
         Sometimes a name is the e-mail address, so the person field will contain the address twice,
         and therefore twice '@'.
         """
-        # log_email_parser.info("Func: split_name_address")
+        log_email_parser_debug.debug(f"Func: split_name_address {fieldvalue}")
         if fieldvalue is None:
             return None
         if not isinstance(fieldvalue, str):
@@ -192,7 +196,7 @@ class EmailParser(IEmailParser):
 
     def separate_names_and_addresses_from_list(self, list_of_name_address_tuple: List[Tuple[str, str]]) -> Tuple[List[str], List[str]]:
         """For e-mail address fields"""
-        # log_email_parser.info("Func: separate_names_and_addresses_from_list")
+        log_email_parser_debug.debug(f" Func: separate_names_and_addresses_from_list {list_of_name_address_tuple}")
         if not list_of_name_address_tuple:
             return [], []
         names, addresses = zip(*list_of_name_address_tuple)

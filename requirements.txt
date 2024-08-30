@@ -5,6 +5,7 @@ polars
 tqdm
 python-docx
 PyPDF2
+pymupdf
 textract
 python-magic
 patool
@@ -13,3 +14,4 @@ vobject
 python-gnupg
 odfpy
 openpyxl
+striprtf

@@ -1,10 +1,13 @@
 import os
 import tempfile
+from typing import Iterator, List
+from aggregator.imbox_extractor import ImboxExtractor
+from config.system_config import SystemConfig
 from utils.logging_setup import log_mbox_extractor
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
-class MboxExtractor:
+class MboxExtractor(ImboxExtractor):
     def __init__(self, mbox_file_path: str, temp_dir=None):
         """
         Initialise le streamer avec le chemin du fichier mbox.
@@ -18,7 +21,7 @@ class MboxExtractor:
             raise FileNotFoundError(f"Mbox file not found: {self.mbox_file_path}")
         self.temp_dir = temp_dir or tempfile.gettempdir()
 
-    def email_generator(self):
+    def _email_generator(self) -> Iterator[bytes]:
         """
         Générateur qui lit le fichier mbox ligne par ligne et yield chaque email complet.
 
@@ -36,7 +39,7 @@ class MboxExtractor:
             if message_lines:
                 yield b''.join(message_lines)
 
-    def extract_emails(self, show_progress: bool = True, num_workers: int = 4):
+    def extract_emails(self, show_progress: bool = True, num_workers: int = SystemConfig.MAX_WORKERS) -> List[str]:
         """
         Extrait les emails du fichier mbox et les sauvegarde en fichiers temporaires en utilisant ProcessPoolExecutor.
 
@@ -44,7 +47,7 @@ class MboxExtractor:
         :param num_workers: Nombre de processus à utiliser pour le traitement.
         """
         total_emails = self._count_emails()
-        generator = self.email_generator()
+        generator = self._email_generator()
 
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             futures = []

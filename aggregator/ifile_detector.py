@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class IFileDetector(ABC):
     """
     Interface for detecting file types.
@@ -12,6 +13,7 @@ class IFileDetector(ABC):
         detect_type() -> str:
             Detects the type of the file ('email', 'mbox', or 'unknown').
     """
+
     @abstractmethod
     def is_email(self) -> bool:
         """Determines if the file is an email based on its extension or content."""

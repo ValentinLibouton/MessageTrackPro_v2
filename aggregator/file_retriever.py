@@ -51,6 +51,5 @@ class FileRetriever(IFileRetriever):
         elif file_type == FileConstants.UNKNOWN_TYPE:
             self.__filepath_dict.setdefault(FileConstants.UNKNOWN_KEY, []).append(file_path)
 
-    @property
     def filepath_dict(self) -> dict:
         return self.__filepath_dict

@@ -6,14 +6,16 @@ class IEmailAggregator(ABC):
     Interface for the EmailAggregator class, providing methods to retrieve, process, and aggregate email data into a database.
     """
 
-    def retrieve_and_process_all_email_types(self) -> None:
+    @abstractmethod
+    def _retrieve_and_process_all_email_types(self) -> None:
         """
         Retrieve and process all email types, including individual email files and mbox files.
         The processed emails are stored in a database.
         """
         pass
 
-    def aggregate_emails_to_database(self, emails: list) -> None:
+    @abstractmethod
+    def _aggregate_emails_to_database(self, emails: list) -> None:
         """
         Aggregate a list of emails into the database.
 
@@ -21,7 +23,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def process_mbox_files(self, mbox_list: list) -> None:
+    @abstractmethod
+    def _process_mbox_files(self, mbox_list: list) -> None:
         """
         Process a list of mbox files, extracting individual emails and storing them in a database.
 
@@ -29,7 +32,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def process_mbox_file(self, mbox_file: str, temp_dir_path: str) -> None:
+    @abstractmethod
+    def _process_mbox_file(self, mbox_file: str, temp_dir_path: str) -> None:
         """
         Process a single mbox file, extract emails, and store them in a database.
 
@@ -38,7 +42,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def process_email_files(self, email_files: list) -> None:
+    @abstractmethod
+    def _process_email_files(self, email_files: list) -> None:
         """
         Process a list of email files, extracting relevant information and storing it in a database.
 
@@ -46,7 +51,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def process_email_file(self, file_path: str) -> tuple[str, dict]:
+    @abstractmethod
+    def _process_email_file(self, file_path: str) -> tuple[str, dict]:
         """
         Process a single email file, extracting relevant information and returning it as a dictionary.
 
@@ -55,7 +61,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def add_emails(self, emails: list) -> None:
+    @abstractmethod
+    def _add_emails(self, emails: list) -> None:
         """
         Add a list of emails to the database using a multi-threaded approach for efficiency.
 
@@ -63,7 +70,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def add_email(self, file_path: str, email: dict) -> None:
+    @abstractmethod
+    def _add_email(self, file_path: str, email: dict) -> None:
         """
         Add a single email to the database, handling insertion of email metadata, addresses, dates, timestamps, and attachments.
 
@@ -72,7 +80,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def remove_files(self, paths_list: list) -> None:
+    @abstractmethod
+    def _remove_files(self, paths_list: list) -> None:
         """
         Remove a list of temporary files from the file system.
 
@@ -80,7 +89,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def create_temp_dir(self, temp_dir: str, sub_dir_name: str) -> str:
+    @abstractmethod
+    def _create_temp_dir(self, temp_dir: str, sub_dir_name: str) -> str:
         """
         Create a temporary directory for storing intermediate files, such as extracted emails.
 
@@ -90,7 +100,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def insert_email_record(self, file_path: str, email: dict) -> str:
+    @abstractmethod
+    def _insert_email_record(self, file_path: str, email: dict) -> str:
         """
         Insert an email record into the database.
 
@@ -100,7 +111,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def insert_aliases(self, email: dict) -> None:
+    @abstractmethod
+    def _insert_aliases(self, email: dict) -> None:
         """
         Insert alias data from the email into the database.
 
@@ -108,7 +120,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def insert_addresses(self, email: dict, email_id: str) -> None:
+    @abstractmethod
+    def _insert_addresses(self, email: dict, email_id: str) -> None:
         """
         Insert email addresses into the database and link them to the given email ID.
 
@@ -117,7 +130,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def insert_dates(self, email: dict, email_id: str) -> None:
+    @abstractmethod
+    def _insert_dates(self, email: dict, email_id: str) -> None:
         """
         Insert date information from the email into the database and link it to the given email ID.
 
@@ -126,7 +140,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def insert_timestamps(self, email: dict, email_id: str) -> None:
+    @abstractmethod
+    def _insert_timestamps(self, email: dict, email_id: str) -> None:
         """
         Insert timestamp information from the email into the database and link it to the given email ID.
 
@@ -135,7 +150,8 @@ class IEmailAggregator(ABC):
         """
         pass
 
-    def insert_attachments(self, email: dict, email_id: str) -> None:
+    @abstractmethod
+    def _insert_attachments(self, email: dict, email_id: str) -> None:
         """
         Insert attachment information from the email into the database and link it to the given email ID.
 

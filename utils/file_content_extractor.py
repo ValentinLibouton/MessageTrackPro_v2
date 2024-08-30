@@ -1,3 +1,5 @@
+from utils.logging_setup import log_file_content_extractor
+from config.file_constants import FileConstants
 import os
 import subprocess
 import PyPDF2
@@ -15,7 +17,7 @@ from odf.text import P
 from openpyxl import load_workbook
 
 
-class FileTextExtractor:
+class FileContentExtractor:
     def __init__(self, file_path=None, content=None):
         self.file_path = file_path
         self.content = content
@@ -44,12 +46,23 @@ class FileTextExtractor:
                 return self._extract_text_from_doc()
             case 'application/vnd.oasis.opendocument.text':
                 return self._extract_text_from_odt()
+            case 'application/vnd.oasis.opendocument.spreadsheet':
+                # Todo !!!
+                pass
             case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
                 return self._extract_text_from_excel()
+            case 'application/vnd.ms-excel':
+                # Todo !!!
+                pass
+            case 'application/vnd.ms-outlook':
+                # Todo !!!
+                pass
             case 'text/plain' | 'text/x-shellscript':
                 return self._extract_text_from_txt()
             case 'text/html':
                 return self._extract_text_from_html()
+            case 'text/rtf':
+                return self._extract_text_from_rtf()
             case 'text/vcard' | 'text/x-vcard':
                 return self._extract_text_from_vcf()
             case 'text/calendar':
@@ -67,13 +80,18 @@ class FileTextExtractor:
                 return self._extract_text_from_pgp_key()
             case 'application/pgp-encrypted':
                 return self._decrypt_pgp_encrypted_file()
+            case 'application/pgp-signature':
+                # Todo !!!
+                pass
             case _:
-                raise ValueError(f"Unsupported file type: {self.file_mime_type}")
+                #raise ValueError(f"Unsupported file type: {self.file_mime_type}")
+                log_file_content_extractor.debug(f"Unsupported file type: {self.file_mime_type}")
 
     def _is_archive(self, mime_type):
         # Les types MIME pour les archives
         archive_mime_types = [
             'application/zip',
+            'application/x-rar',
             'application/x-rar-compressed',
             'application/x-7z-compressed',
             'application/gzip',
@@ -99,9 +117,11 @@ class FileTextExtractor:
             for root, dirs, files in os.walk(temp_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
-                    sub_extractor = FileTextExtractor(file_path=file_path)
+                    sub_extractor = FileContentExtractor(file_path=file_path)
                     try:
-                        extracted_text.append(sub_extractor.extract_text())
+                        text = sub_extractor.extract_text()
+                        if text:
+                            extracted_text.append(sub_extractor.extract_text())
                     except ValueError as e:
                         print(f"Unsupported file type {file} inside archive: {e}")
 
@@ -111,19 +131,56 @@ class FileTextExtractor:
             shutil.rmtree(temp_dir)
 
     def _extract_text_from_pdf(self):
-        if self.file_path:
-            with open(self.file_path, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
-                text = ""
+        text = ""
+
+        # First attempt using PyPDF2
+        try:
+            if self.file_path:
+                with open(self.file_path, 'rb') as file:
+                    reader = PyPDF2.PdfReader(file)
+                    for page in reader.pages:
+                        text += page.extract_text()
+            elif self.content:
+                reader = PyPDF2.PdfReader(BytesIO(self.content))
                 for page in reader.pages:
                     text += page.extract_text()
             return text
-        elif self.content:
-            reader = PyPDF2.PdfReader(BytesIO(self.content))
+
+        except Exception as e:
+            print(f"PyPDF2 failed: {e}")
+
+        # Second attempt using PyMuPDF (fitz)
+        import fitz
+        try:
+            if self.file_path:
+                doc = fitz.open(self.file_path)
+            elif self.content:
+                doc = fitz.open(stream=self.content, filetype="pdf")
+
             text = ""
-            for page in reader.pages:
-                text += page.extract_text()
+            for page in doc:
+                text += page.get_text()
+            doc.close()
             return text
+
+        except Exception as e:
+            print(f"PyMuPDF failed: {e}")
+
+        # Final attempt using pdfminer.six
+        from pdfminer.high_level import extract_text as pdfminer_extract_text
+        try:
+            if self.file_path:
+                text = pdfminer_extract_text(self.file_path)
+            elif self.content:
+                with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                    temp_file.write(self.content)
+                    temp_file.close()
+                    text = pdfminer_extract_text(temp_file.name)
+                    os.remove(temp_file.name)
+            return text
+
+        except Exception as e:
+            raise Exception(f"Failed to extract text from PDF using all available methods: {e}")
 
     def _extract_text_from_docx(self):
         if self.file_path:
@@ -150,7 +207,7 @@ class FileTextExtractor:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".doc") as temp_file:
                 temp_file.write(self.content)
                 temp_file.close()
-                temp_extractor = FileTextExtractor(file_path=temp_file.name)
+                temp_extractor = FileContentExtractor(file_path=temp_file.name)
                 text = temp_extractor._extract_text_from_doc()
                 os.remove(temp_file.name)
                 return text
@@ -185,10 +242,19 @@ class FileTextExtractor:
 
     def _extract_text_from_txt(self):
         if self.file_path:
-            with open(self.file_path, 'r', encoding='utf-8') as file:
-                text = file.read()
+            with open(self.file_path, 'rb') as file:
+                content = file.read()
         elif self.content:
-            text = self.content.decode('utf-8')
+            content = self.content
+        text = None
+        for encoding in FileConstants.SUPPORTED_ENCODINGS:
+            try:
+                text = content.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                log_file_content_extractor.warning(f"Failed to decode with {encoding}")
+        if text is None:
+            raise UnicodeDecodeError("Unable to decode text with supported encodings.")
         return text
 
     def _extract_text_from_html(self):
@@ -208,6 +274,15 @@ class FileTextExtractor:
         except Exception as e:
             print(f"Error processing HTML file: {e}")
             return ""
+
+    def _extract_text_from_rtf(self):
+        from striprtf.striprtf import rtf_to_text
+        if self.file_path:
+            with open(self.file_path, 'r') as file:
+                rtf_content = file.read()
+        elif self.content:
+            rtf_content = self.content.decode('utf-8')
+        return rtf_to_text(rtf_content)
 
     def _extract_text_from_pgp_key(self):
         if self.file_path:
@@ -233,7 +308,7 @@ class FileTextExtractor:
         temp_file.close()
 
         # Récursivement extraire le texte du fichier décrypté
-        sub_extractor = FileTextExtractor(temp_file.name)
+        sub_extractor = FileContentExtractor(temp_file.name)
         extracted_text = sub_extractor.extract_text()
 
         os.remove(temp_file.name)
@@ -296,6 +371,6 @@ class FileTextExtractor:
 
 
 if __name__ == "__main__":
-    file_path = "/home/valentin/github/MessageTrackPro_v2/attachments/fee82a7202eb32c93010e141a6f601ef710b8343bfc32b0a273e30908c0b254d.doc"
-    file_text_extractor = FileTextExtractor(file_path=file_path)
+    file_path = "fee82a7202eb32c93010e141a6f601ef710b8343bfc32b0a273e30908c0b254d.doc"
+    file_text_extractor = FileContentExtractor(file_path=file_path)
     print(file_text_extractor.extract_text())
