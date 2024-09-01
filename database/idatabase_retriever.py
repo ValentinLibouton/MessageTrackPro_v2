@@ -41,4 +41,3 @@ class IDatabaseRetriever(ABC):
     @abstractmethod
     def join(self) -> Self:
         pass
-    

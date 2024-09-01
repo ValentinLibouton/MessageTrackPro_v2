@@ -1,12 +1,16 @@
+from abc import abstractmethod
 import sqlite3
-from typing import Self
+from typing import Self, Tuple
 from database.sql_request import SQLRequest
 from utils.date_transformer import DateTransformer
 from config.db_constants import DBConstants, DatabaseRetrieverConstants
+from utils.string_cleaner import StringCleaner
 
 
 class DatabaseRetriever:
-    def __init__(self, db_name=DBConstants.DB_NAME, **kwargs):
+    def __init__(self, db_name: str = DBConstants.DB_NAME, contacts: list = [], aliases: list = [],
+                 addresses: list = [], start_date: str = "", end_date: str = "", words: list = [],
+                 words_localization: list = [], word_operator: str = 'OR', attachment_types: list = []):
         """
         : contacts: filtering on specific contacts
         : aliases: filtering on specific aliases
@@ -20,13 +24,31 @@ class DatabaseRetriever:
         :attachment_types: filtering on attachment types
 
         """
-        # self.sql_requests = SQLRequest()
-
+        # region args
         self.db_name = db_name
-        self.params = kwargs
-        self.valid_localization = DBConstants.KEYWORD_SEARCH_FIELDS
-        self.words_localization_control()
-        self.date_to_timestamp()
+        self.contacts = contacts
+        self.aliases = aliases
+        self.addresses = addresses
+        self.start_date = start_date
+        self.end_date = end_date
+        self.words = words
+        self.words_localization = words_localization
+        self.word_operator = word_operator
+        self.attachment_types = attachment_types
+        # endregion
+        # region constants
+        self.valid_localizations = DatabaseRetrieverConstants.KEYWORD_SEARCH_FIELDS  # todo
+        self.everywhere = DatabaseRetrieverConstants.EVERYWHERE_LOCALISATION
+        # endregion
+        # region initialization
+        self.words_localization = self.configure_localization(everywhere=self.everywhere,
+                                                              words_localization=self.words_localization,
+                                                              valid_localizations=self.valid_localizations)
+        self.__start_timestamp, self.__end_timestamp = self.date_settings(start_date=self.start_date,
+                                                                          end_date=self.end_date)
+        # endregion
+        # region objects
+        self.sc = StringCleaner()
 
         self.join_clauses = []
         self.where_clauses = set()
@@ -35,24 +57,39 @@ class DatabaseRetriever:
         self.limit_clause = ""
         self.request = ""
 
-    def words_localization_control(self) -> None:
-        words_localization = self.params.get(DatabaseRetrieverConstants.WORDS_LOCALIZATION, [])
-        everywhere = DatabaseRetrieverConstants.EVERYWHERE_LOCALISATION
-        if everywhere in words_localization:
-            self.params[DatabaseRetrieverConstants.WORDS_LOCALIZATION] = [everywhere]
+    def validate_arguments(self):
+        for arg in [self.db_name, self.start_date, self.end_date, self.word_operator]:
+            if not isinstance(arg, str):
+                raise TypeError(f'{arg} must be a string')
+
+        for arg in [self.contacts, self.aliases, self.addresses, self.words, self.words_localization,
+                    self.attachment_types]:
+            if not isinstance(arg, list):
+                raise TypeError(f'{arg} must be a list')
+
+        self.word_operator = self.word_operator.upper()
+        if self.word_operator not in ["AND", "OR"]:
+            raise TypeError(f'word operator must be OR or AND, value: {self.word_operator}')
+
+    @abstractmethod
+    def configure_localization(self, everywhere, words_localization, valid_localizations):
+        if words_localization == []:
+            return words_localization
+        elif everywhere in words_localization:
+            words_localization = [everywhere]
         else:
             for localization in words_localization:
-                if localization not in self.valid_localization:
+                if localization not in valid_localizations:
                     raise ValueError(
-                        f"{localization} is not a valid words localization, valid values are: {self.valid_localization}")
-        self.word_operator = self.params.get('word_operator', DatabaseRetrieverConstants.DEFAULT_WORD_OPERATOR)
+                        f"{localization} is not a valid words localization, valid values are: {valid_localizations}")
+        return words_localization
 
-    def date_to_timestamp(self) -> None:
+    @abstractmethod
+    def date_settings(self, start_date, end_date) -> tuple[int, int]:
         dt = DateTransformer()
-        self.__start_date = self.params.get(DatabaseRetrieverConstants.START_DATE, 0)
-        self.__end_date = self.params.get(DatabaseRetrieverConstants.END_DATE, None)
-        self.start_timestamp = dt.convert_to_timestamp(self.__start_date)
-        self.end_timestamp = dt.convert_to_timestamp(self.__end_date)
+        start_date = start_date if start_date else 0
+        end_date = end_date if end_date else None
+        return dt.convert_to_timestamp(start_date), dt.convert_to_timestamp(end_date)
 
     def select(self) -> Self:
         self.request = f"""SELECT DISTINCT e.id FROM Emails e"""
@@ -106,28 +143,22 @@ class DatabaseRetriever:
         return self.request
 
     def join(self) -> Self:
-        if 'everywhere' in self.params.get('words_localization', []) and self.params.get('words', []):
+        if self.everywhere in self.words_localization and self.words:
             self._join_email_addresses()
             self._join_contacts()
             self._join_aliases()
             self._join_dates()
             self._join_attachments()
-
-        if (self.params.get('contacts')
-                or ('contact' in self.params.get('words_localization', []) and self.params.get('words', []))):
+        if self.contacts or (DatabaseRetrieverConstants.CONTACT in self.words_localization and self.words):
             self._join_email_addresses()
             self._join_contacts()
-
-        if (self.params.get('aliases')
-                or ('alias' in self.params.get('words_localization', []) and self.params.get('words', []))):
+        if self.aliases or (DatabaseRetrieverConstants.ALIAS in self.words_localization and self.words):
             self._join_email_addresses()
             self._join_contacts()
             self._join_aliases()
-
-        if (self.params.get('addresses')
-                or ('address' in self.params.get('words_localization', []) and self.params.get('words', []))):
+        if self.addresses or (DatabaseRetrieverConstants.ADDRESS in self.words_localization and self.words):
             self._join_email_addresses()
-
+        # Todo arrivé ici. Je dois adapter la suite ci-dessous
         if self.params.get('start_date') or self.params.get('end_date'):
             self._join_dates()
 
@@ -220,7 +251,7 @@ class DatabaseRetriever:
             word_conditions = []
             added_conditions = set()
             if "everywhere" in self.params.get('words_localization', []):
-                localizations = self.valid_localization[1:]
+                localizations = self.valid_localizations[1:]
             else:
                 localizations = self.params.get('words_localization', [])
 
