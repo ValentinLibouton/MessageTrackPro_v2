@@ -4,6 +4,7 @@ from typing import Self, Tuple
 from database.sql_request import SQLRequest
 from utils.date_transformer import DateTransformer
 from config.db_constants import DBConstants, DatabaseRetrieverConstants
+from config.sql_constants import *
 from utils.string_cleaner import StringCleaner
 
 
@@ -92,7 +93,7 @@ class DatabaseRetriever:
         return dt.convert_to_timestamp(start_date), dt.convert_to_timestamp(end_date)
 
     def select(self) -> Self:
-        self.request = f"""SELECT DISTINCT e.id FROM Emails e"""
+        self.request = f"""SELECT DISTINCT {E_ID} FROM {TABLE_EMAILS} {ALIAS_EMAILS}"""
         return self
 
     def add_join(self, join_clause: str) -> None:
@@ -158,46 +159,56 @@ class DatabaseRetriever:
             self._join_aliases()
         if self.addresses or (DatabaseRetrieverConstants.ADDRESS in self.words_localization and self.words):
             self._join_email_addresses()
-        # Todo arrivé ici. Je dois adapter la suite ci-dessous
-        if self.params.get('start_date') or self.params.get('end_date'):
+        if self.start_date or self.end_date:
             self._join_dates()
-
-        if (self.params.get('attachment_types')
-                or ('attachment' in self.params.get('words_localization', []) and self.params.get('words', []))
-                or ('attachment_name' in self.params.get('words_localization', []) and self.params.get('words', []))):
+        if self.attachment_types or (DatabaseRetrieverConstants.ATTACHMENT in self.words_localization and self.words) or (DatabaseRetrieverConstants.ATTACHMENT_NAME in self.words_localization and self.words):
             self._join_attachments()
-
         return self
 
     def _join_email_addresses(self):
-        self.add_join("LEFT JOIN Email_From ef ON e.id = ef.email_id")
-        self.add_join("LEFT JOIN Email_To et ON e.id = et.email_id")
-        self.add_join("LEFT JOIN Email_Cc ec ON e.id = ec.email_id")
-        self.add_join("LEFT JOIN Email_Bcc eb ON e.id = eb.email_id")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_FROM} {ALIAS_EMAIL_FROM} ON {E_ID} = {EF_EMAIL_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_TO} {ALIAS_EMAIL_TO} ON {E_ID} = {ET_EMAIL_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_CC} {ALIAS_EMAIL_CC} ON {E_ID} = {EC_EMAIL_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_BCC} {ALIAS_EMAIL_BCC} ON {E_ID} = {EB_EMAIL_ID}")
 
-        self.add_join("LEFT JOIN EmailAddresses ea1 ON ea1.id = ef.email_address_id")
-        self.add_join("LEFT JOIN EmailAddresses ea2 ON ea2.id = et.email_address_id")
-        self.add_join("LEFT JOIN EmailAddresses ea3 ON ea3.id = ec.email_address_id")
-        self.add_join("LEFT JOIN EmailAddresses ea4 ON ea4.id = eb.email_address_id")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_ADDRESSES} {ALIAS_EMAIL_ADDRESSES_FROM} ON {EA1_ID} = {EF_EMAIL_ADDRESS_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_ADDRESSES} {ALIAS_EMAIL_ADDRESSES_TO} ON {EA2_ID} = {ET_EMAIL_ADDRESS_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_ADDRESSES} {ALIAS_EMAIL_ADDRESSES_CC} ON {EA3_ID} = {EC_EMAIL_ADDRESS_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_ADDRESSES} {ALIAS_EMAIL_ADDRESSES_BCC} ON {EA4_ID} = {EB_EMAIL_ADDRESS_ID}")
 
     def _join_contacts(self):
-        [self.add_join(f"LEFT JOIN Contacts_EmailAddresses cea{i} ON ea{i}.id = cea{i}.email_address_id") for i in
-         range(1, 5)]
-        [self.add_join(f"LEFT JOIN Contacts c{i} ON cea{i}.contact_id = c{i}.id") for i in range(1, 5)]
+        self.add_join(
+            f"LEFT JOIN {TABLE_CONTACTS_EMAIL_ADDRESSES} {ALIAS_CONTACTS_EMAIL_ADDRESSES_FROM} ON {EA1_ID} = {CEA1_EMAIL_ADDRESS_ID}")
+        self.add_join(
+            f"LEFT JOIN {TABLE_CONTACTS_EMAIL_ADDRESSES} {ALIAS_CONTACTS_EMAIL_ADDRESSES_TO} ON {EA2_ID} = {CEA2_EMAIL_ADDRESS_ID}")
+        self.add_join(
+            f"LEFT JOIN {TABLE_CONTACTS_EMAIL_ADDRESSES} {ALIAS_CONTACTS_EMAIL_ADDRESSES_CC} ON {EA3_ID} = {CEA3_EMAIL_ADDRESS_ID}")
+        self.add_join(
+            f"LEFT JOIN {TABLE_CONTACTS_EMAIL_ADDRESSES} {ALIAS_CONTACTS_EMAIL_ADDRESSES_BCC} ON {EA4_ID} = {CEA4_EMAIL_ADDRESS_ID}")
+
+        self.add_join(f"LEFT JOIN {TABLE_CONTACTS} {ALIAS_CONTACTS_FROM} ON {CEA1_CONTACT_ID} = {C1_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_CONTACTS} {ALIAS_CONTACTS_TO} ON {CEA2_CONTACT_ID} = {C2_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_CONTACTS} {ALIAS_CONTACTS_CC} ON {CEA3_CONTACT_ID} = {C3_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_CONTACTS} {ALIAS_CONTACTS_BCC} ON {CEA4_CONTACT_ID} = {C4_ID}")
 
     def _join_aliases(self):
-        [self.add_join(f"LEFT JOIN Contacts_Alias ca{i} ON c{i}.id = ca{i}.contact_id") for i in range(1, 5)]
-        [self.add_join(f"LEFT JOIN Alias a{i} ON ca{i}.alias_id = a{i}.id") for i in range(1, 5)]
+        self.add_join(f"LEFT JOIN {TABLE_CONTACTS_ALIAS} {ALIAS_CONTACTS_ALIAS_FROM} ON {C1_ID} = {CA1_CONTACT_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_CONTACTS_ALIAS} {ALIAS_CONTACTS_ALIAS_TO} ON {C2_ID} = {CA2_CONTACT_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_CONTACTS_ALIAS} {ALIAS_CONTACTS_ALIAS_CC} ON {C3_ID} = {CA3_CONTACT_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_CONTACTS_ALIAS} {ALIAS_CONTACTS_ALIAS_BCC} ON {C4_ID} = {CA4_CONTACT_ID}")
+
+        self.add_join(f"LEFT JOIN {TABLE_ALIAS} {ALIAS_ALIAS_FROM} ON {CA1_ALIAS_ID} = {A1_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_ALIAS} {ALIAS_ALIAS_TO} ON {CA2_ALIAS_ID} = {A2_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_ALIAS} {ALIAS_ALIAS_CC} ON {CA3_ALIAS_ID} = {A3_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_ALIAS} {ALIAS_ALIAS_BCC} ON {CA4_ALIAS_ID} = {A4_ID}")
 
     def _join_dates(self):
-        # self.add_join("LEFT JOIN Email_Date ed ON e.id = ed.email_id")
-        # self.add_join("LEFT JOIN Date d ON ed.date_id = d.id")
-        self.add_join("LEFT JOIN Email_Timestamp eti ON e.id = eti.email_id")
-        self.add_join("LEFT JOIN Timestamp ts ON eti.timestamp_id = ts.id")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_TIMESTAMP} {ALIAS_EMAIL_TIMESTAMP} ON {E_ID} = {ETI_EMAIL_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_TIMESTAMP} {ALIAS_TIMESTAMP} ON {ETI_TIMESTAMP_ID} = {TS_ID}")
 
     def _join_attachments(self):
-        self.add_join("LEFT JOIN Email_Attachments ea ON e.id = ea.email_id")
-        self.add_join("LEFT JOIN Attachments a ON ea.attachment_id = a.id")
+        self.add_join(f"LEFT JOIN {TABLE_EMAIL_ATTACHMENTS} {ALIAS_EMAIL_ATTACHMENTS} ON {E_ID} = {EA_EMAIL_ID}")
+        self.add_join(f"LEFT JOIN {TABLE_ATTACHMENTS} {ALIAS_ATTACHMENTS} ON {EA_ATTACHMENT_ID} = {A_ID}")
 
     def where(self):
         self._where_date()
@@ -210,76 +221,72 @@ class DatabaseRetriever:
 
     def _where_date(self):
         date_conditions = []
-        if self.params.get('start_date') and self.params.get('end_date'):
-            date_conditions.append(f"ts.timestamp BETWEEN '{self.start_timestamp}' AND '{self.end_timestamp}'")
-        elif self.params.get('start_date'):
-            date_conditions.append(f"ts.timestamp >= '{self.start_timestamp}'")
-        elif self.params.get('end_date'):
-            date_conditions.append(f"ts.timestamp <= '{self.end_timestamp}'")
+        if self.start_date and self.end_date:
+            date_conditions.append(f"{TS_TIMESTAMP} BETWEEN '{self.__start_timestamp}' AND '{self.__end_timestamp}'")
+        elif self.start_date:
+            date_conditions.append(f"{TS_TIMESTAMP} >= '{self.__start_timestamp}'")
+        elif self.end_date:
+            date_conditions.append(f"{TS_TIMESTAMP} <= '{self.__end_timestamp}'")
         if date_conditions:
             self.add_where_and(condition=" AND ".join(date_conditions))
 
     def _where_contacts(self):
-        if self.params.get('contacts'):
+        if self.contacts:
             contact_conditions = " OR ".join(
-                [f"LOWER(c{i}.first_name) = LOWER('{first_name}') AND LOWER(c{i}.last_name) = LOWER('{last_name}')"
-                 for first_name, last_name in self.params['contacts'] for i in range(1, 5)])
+                [f"LOWER({first}) = LOWER('{first_name}') AND LOWER({last}) = LOWER('{last_name}')"
+                 for first_name, last_name in self.contacts for first, last in zip(C_FIRST_NAME, C_LAST_NAME)])
             self.add_where(f"({contact_conditions})")
-
+    # Todo: ICI
     def _where_aliases(self):
-        if self.params.get('aliases'):
+        if self.aliases:
             alias_conditions = " OR ".join(
-                [f"LOWER(a{i}.alias) = LOWER('{alias}')" for alias in self.params['aliases'] for i in range(1, 5)])
+                [f"LOWER(a{i}.alias) = LOWER('{alias}')" for alias in self.aliases for i in range(1, 5)])
             self.add_where(f"({alias_conditions})")
 
     def _where_addresses(self):
-        if self.params.get('addresses'):
+        if self.addresses:
             address_conditions = " OR ".join(
-                [f"LOWER(ea{i}.email_address) = LOWER('{address}')" for address in self.params['addresses'] for i in
+                [f"LOWER(ea{i}.email_address) = LOWER('{address}')" for address in self.addresses for i in
                  range(1, 5)])
             self.add_where(f"({address_conditions})")
 
     def _where_attachments_types(self):
-        if self.params.get('attachments_type'):
+        if self.attachment_types:
             attachment_conditions = " OR ".join(
-                [f"LOWER(a.filename) LIKE '%.{file_type.lower()}'" for file_type in self.params['attachment_types']]
+                [f"LOWER(a.filename) LIKE '%.{file_type.lower()}'" for file_type in self.attachment_types]
             )
             self.add_where(f"({attachment_conditions})")
 
     def _where_words(self):
-        if self.params.get('words'):
+        if self.words:
             word_conditions = []
             added_conditions = set()
-            if "everywhere" in self.params.get('words_localization', []):
-                localizations = self.valid_localizations[1:]
-            else:
-                localizations = self.params.get('words_localization', [])
 
-            for word in self.params['words']:
+            for word in self.words:
                 word = word.lower()
                 conditions = []
 
-                if "contact" in localizations:
+                if "contact" in self.localizations:
                     conditions.extend(
                         [f"LOWER(c{i}.first_name) LIKE '%{word}%' OR LOWER(c{i}.last_name) LIKE '%{word}%'" for i in
                          range(1, 5)])
 
-                if "alias" in localizations:
+                if "alias" in self.localizations:
                     conditions.extend([f"LOWER(a{i}.alias) LIKE '%{word}%'" for i in range(1, 5)])
 
-                if "address" in localizations:
+                if "address" in self.localizations:
                     conditions.extend([f"LOWER(ea{i}.email_address) LIKE '%{word}%'" for i in range(1, 5)])
 
-                if "subject" in localizations:
+                if "subject" in self.localizations:
                     conditions.append(f"LOWER(e.subject) LIKE '%{word}%'")
 
-                if "body" in localizations:
+                if "body" in self.localizations:
                     conditions.append(f"LOWER(e.body) LIKE '%{word}%'")
 
-                if "attachment_name" in localizations:
+                if "attachment_name" in self.localizations:
                     conditions.append(f"LOWER(a.filename) LIKE '%{word}%'")
 
-                if "attachment" in localizations:
+                if "attachment" in self.localizations:
                     # ToDo: I need to develop a class which, depending on the type of extension,
                     #  will try to retrieve the text from EmailParser and add a column to the db to display the extracted text.
                     conditions.append(f"LOWER(a.extracted_text) LIKE '%{word}%'")

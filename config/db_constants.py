@@ -24,7 +24,10 @@ class DBConstants:
 
     # CONTACTS
     CONTACTS_TABLE: str = 'Contacts'
-    CONTACTS_COLUMNS: list[str] = ['first_name', 'last_name']
+    FIRST_NAME = 'first_name'
+    LAST_NAME = 'last_name'
+    CONTACTS_COLUMNS: list[str] = [FIRST_NAME, LAST_NAME]
+
 
     # Alias
     ALIAS_TABLE: str = 'Alias'
