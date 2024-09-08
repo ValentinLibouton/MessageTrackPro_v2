@@ -86,6 +86,7 @@ class EmailParser(IEmailParser):
             if self._is_multipart(part=part):
                 continue  # Skip multipart container, go deeper
             elif self._is_body_part(part=part):
+
                 if part.get_content_type() in ["text/plain", "text/html"]:
                     charset = part.get_content_charset()
                     if charset:
