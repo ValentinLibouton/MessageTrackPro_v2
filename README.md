@@ -35,7 +35,7 @@ _____________________________________________________________________
 ![Table](images/Tables.png)
 
 ## Join
-![Join](images/Joins.png)
+![Join](images/Join.png)
 
 ## Where
 ![Where](images/Where.png)
