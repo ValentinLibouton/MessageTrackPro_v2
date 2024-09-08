@@ -1,13 +1,21 @@
+# idatabase_retriever.py
+# Libraries
 from abc import ABC, abstractmethod
 from typing import Self
 
+
 class IDatabaseRetriever(ABC):
+
     @abstractmethod
-    def words_localization_control(self) -> None:
+    def validate_arguments(self) -> None:
         pass
 
     @abstractmethod
-    def date_to_timestamp(self) -> None:
+    def configure_localization(self, everywhere, words_localization, valid_localizations) -> list:
+        pass
+
+    @abstractmethod
+    def date_settings(self, start_date: str, end_date: str) -> tuple[int, int]:
         pass
 
     @abstractmethod
@@ -40,4 +48,60 @@ class IDatabaseRetriever(ABC):
 
     @abstractmethod
     def join(self) -> Self:
+        pass
+
+    @abstractmethod
+    def _join_email_addresses(self) -> None:
+        pass
+
+    @abstractmethod
+    def _join_contacts(self) -> None:
+        pass
+
+    @abstractmethod
+    def _join_aliases(self) -> None:
+        pass
+
+    @abstractmethod
+    def _join_dates(self) -> None:
+        pass
+
+    @abstractmethod
+    def _join_attachments(self) -> None:
+        pass
+
+    @abstractmethod
+    def where(self) -> Self:
+        pass
+
+    @abstractmethod
+    def _where_date(self) -> None:
+        pass
+
+    @abstractmethod
+    def _where_contacts(self) -> None:
+        pass
+
+    @abstractmethod
+    def _where_aliases(self) -> None:
+        pass
+
+    @abstractmethod
+    def _where_addresses(self) -> None:
+        pass
+
+    @abstractmethod
+    def _where_attachments_types(self) -> None:
+        pass
+
+    @abstractmethod
+    def _where_words(self) -> None:
+        pass
+
+    @abstractmethod
+    def execute(self, params=None) -> list:
+        pass
+
+    @abstractmethod
+    def show_query(self) -> str:
         pass

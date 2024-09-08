@@ -1,8 +1,10 @@
+# iemail_parser.py
+# Libraries
 from abc import ABC, abstractmethod
 
 
 class IEmailParser(ABC):
-    def parse_email(self, email_content):
+    def parse_email(self, email_content: bytes) -> dict:
         """
         Analyse le contenu d'un email et retourne un dictionnaire avec les données pertinentes.
 

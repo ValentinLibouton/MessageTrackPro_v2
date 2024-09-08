@@ -1,19 +1,27 @@
+# email_database.py
+# Libraries
 import sqlite3
+# Interfaces
+from database.iemail_database import IEmailDatabase
+# Constants
+from config.db_constants import DBConstants
+# Personal libraries
 from database.sql_request import SQLRequest
 from utils.string_cleaner import StringCleaner
 from utils.logging_setup import log_email_database
-from config.db_constants import DBConstants
 
 
-class EmailDatabase:
-    def __init__(self, db_name=DBConstants.DB_NAME, sql_file=DBConstants.SQL_NAME, string_cleaner=None, sql_requests=None):
+
+class EmailDatabase(IEmailDatabase):
+    def __init__(self, db_name=DBConstants.DB_NAME, sql_file=DBConstants.SQL_NAME, string_cleaner=None,
+                 sql_requests=None):
         self.string_cleaner = string_cleaner if string_cleaner else StringCleaner()
         self.db_name = db_name
         self.sql_file = sql_file
         self.sql_requests = sql_requests if sql_requests else SQLRequest()
         self._create_tables()
 
-    def _create_tables(self):
+    def _create_tables(self) -> None:
         log_email_database.info(f"Func: _create_tables, database creation")
         conn = sqlite3.connect(self.db_name)
         c = conn.cursor()
@@ -23,9 +31,8 @@ class EmailDatabase:
         conn.commit()
         conn.close()
 
-
-    def insert_contact(self, first_name, last_name, return_existing_id=False):
-        #log_email_database.info(f"Func: insert_contact")
+    def insert_contact(self, first_name: str, last_name: str, return_existing_id=False) -> int | None:
+        # log_email_database.info(f"Func: insert_contact")
         first_name = self.string_cleaner.to_lower_and_strip(first_name)
         last_name = self.string_cleaner.to_lower_and_strip(last_name)
         with sqlite3.connect(self.db_name) as conn:
@@ -41,8 +48,8 @@ class EmailDatabase:
                 contact_id = c.fetchone()[0]
             return contact_id
 
-    def insert_alias(self, alias, return_existing_id=False):
-        #log_email_database.info(f"Func: insert_alias")
+    def insert_alias(self, alias: str, return_existing_id=False) -> int | None:
+        # log_email_database.info(f"Func: insert_alias")
         alias = self.string_cleaner.to_lower_and_strip(alias)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
@@ -56,8 +63,8 @@ class EmailDatabase:
                 alias_id = c.fetchone()[0]
             return alias_id
 
-    def insert_email_address(self, email_address, return_existing_id=False):
-        #log_email_database.info(f"Func: insert_email_address")
+    def insert_email_address(self, email_address: str, return_existing_id=False) -> int | None:
+        # log_email_database.info(f"Func: insert_email_address")
         email_address = self.string_cleaner.to_lower_and_strip(email_address)
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
@@ -72,7 +79,7 @@ class EmailDatabase:
                 address_id = c.fetchone()[0]
             return address_id
 
-    def insert_email(self, id, filepath, filename, subject, body, return_existing_id=False):
+    def insert_email(self, id: str, filepath: str, filename: str, subject: str, body: str) -> str:
         log_email_database.info(f"Func: insert_email")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
@@ -82,8 +89,8 @@ class EmailDatabase:
             conn.commit()
             return id
 
-    def insert_date(self, date, return_existing_id=False):
-        #log_email_database.info(f"Func: insert_date")
+    def insert_date(self, date: str, return_existing_id=False) -> int | None:
+        # log_email_database.info(f"Func: insert_date")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.insert(table=DBConstants.DATE_TABLE,
@@ -100,8 +107,8 @@ class EmailDatabase:
                     return None
             return date_id
 
-    def insert_timestamp(self, timestamp, return_existing_id=False):
-        #log_email_database.info(f"Func: insert_timestamp")
+    def insert_timestamp(self, timestamp: int, return_existing_id=False) -> int | None:
+        # log_email_database.info(f"Func: insert_timestamp")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
             c.execute(self.sql_requests.insert(table=DBConstants.TIMESTAMP_TABLE,
@@ -118,8 +125,7 @@ class EmailDatabase:
                     return None
             return timestamp_id
 
-
-    def insert_attachment(self, id, filename, content, extracted_text, return_existing_id=False):
+    def insert_attachment(self, id: str, filename: str, content: str, extracted_text: str, return_existing_id=False) -> str:
         log_email_database.info(f"Func: insert_attachment")
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
@@ -129,9 +135,9 @@ class EmailDatabase:
             conn.commit()
             return id
 
-    def link(self, table, col_name_1, col_name_2, value_1, value_2):
+    def link(self, table: str, col_name_1: str, col_name_2: str, value_1: int | str, value_2: int | str) -> None:
         """Only 'value_2' can be of type (list, tuple, set) in addition to being of type int or str"""
-        #log_email_database.info(f"Func: link, Table: {table}")
+        # log_email_database.info(f"Func: link, Table: {table}")
         request = self.sql_requests.link(table=table, col_name_1=col_name_1, col_name_2=col_name_2)
         if isinstance(value_2, (list, tuple, set)):
             with sqlite3.connect(self.db_name) as conn:

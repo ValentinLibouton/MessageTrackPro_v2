@@ -1,21 +1,25 @@
+# email_aggregator.py
+# Libraries
 import os
 import sys
 from tqdm import tqdm
 from queue import Queue
 from threading import Thread
-
+# Interfaces
+from aggregator.iemail_aggregator import IEmailAggregator
+# Constants
 from config.system_config import SystemConfig
 from config.file_constants import FileConstants
 from config.db_constants import DBConstants
 from config.email_constants import *
+# Personal libraries
 from utils.string_cleaner import StringCleaner
 from utils.logging_setup import log_email_aggregator_info, log_email_aggregator_debug, log_email_aggregator_error
-
-from aggregator.iemail_aggregator import IEmailAggregator
 from aggregator.file_retriever import FileRetriever
 from aggregator.mbox_extractor import MboxExtractor
 from parser.email_parser import EmailParser
 from database.email_database import EmailDatabase
+
 
 
 class EmailAggregator(IEmailAggregator):
@@ -55,7 +59,8 @@ class EmailAggregator(IEmailAggregator):
     def _process_mbox_files(self, mbox_list: list) -> None:
         for i, mbox_file in enumerate(mbox_list):
             mbox_file_name = self.sc.get_filename_from_path(path=mbox_file, remove_extension_file=True)
-            temp_dir_path = self._create_temp_dir(temp_dir=self.temp_eml_storage_dir, sub_dir_name=f"{mbox_file_name}_{i + 1}")
+            temp_dir_path = self._create_temp_dir(temp_dir=self.temp_eml_storage_dir,
+                                                  sub_dir_name=f"{mbox_file_name}_{i + 1}")
             self._process_mbox_file(mbox_file=mbox_file, temp_dir_path=temp_dir_path)
 
     def _process_mbox_file(self, mbox_file: str, temp_dir_path: str) -> None:
@@ -149,6 +154,7 @@ class EmailAggregator(IEmailAggregator):
         return email_id
 
     def _insert_aliases(self, email: dict) -> None:
+        ALL_NAMES = [FROM_NAME, TO_NAMES, CC_NAMES, BCC_NAMES]
         for name_key in ALL_NAMES:
             for names in email[name_key]:
                 if isinstance(names, list) or isinstance(names, tuple) or isinstance(names, set):
@@ -165,7 +171,8 @@ class EmailAggregator(IEmailAggregator):
             (DBConstants.EMAIL_BCC_TABLE, DBConstants.EMAIL_BCC_COLUMNS, email[BCC_ADDRESSES])
         ]
         for table, columns, addresses in address_mappings:
-            ids = [self._db.insert_email_address(email_address=address, return_existing_id=True) for address in addresses]
+            ids = [self._db.insert_email_address(email_address=address, return_existing_id=True) for address in
+                   addresses]
             self._db.link(table=table, col_name_1=columns[0], col_name_2=columns[1], value_1=email_id, value_2=ids)
 
     def _insert_dates(self, email: dict, email_id: str) -> None:

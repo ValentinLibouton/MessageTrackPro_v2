@@ -1,3 +1,4 @@
+# email_constants.py
 EMAIL_ID = 'email_id'
 FROM_NAME = 'from_name'
 FROM_ADDRESS = 'from_address'
@@ -19,7 +20,5 @@ ATTACHMENT_ID = 'attachment_id'
 ATTACHMENT_FILENAME = 'filename'
 ATTACHMENT_CONTENT = 'content'
 ATTACHMENT_EXTRACTED_TEXT = 'extracted_text'
-
-ALL_NAMES = [FROM_NAME, TO_NAMES, CC_NAMES, BCC_NAMES]
 
 DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'

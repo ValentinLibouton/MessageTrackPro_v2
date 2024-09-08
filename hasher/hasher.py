@@ -1,6 +1,8 @@
+# hasher.py
+# Libraries
 import hashlib
-import os
-from .ihashable import IHasher
+# Interfaces
+from .ihasher import IHasher
 
 
 class Hasher(IHasher):

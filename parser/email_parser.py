@@ -1,16 +1,20 @@
+# email_parser.py
+# Libraries
 import gc
 import os
 from email import policy
 from email.parser import BytesParser
-import mailbox
 from datetime import datetime
 from typing import Optional, Tuple, List, Dict, Union, Any
-
+from abc import abstractmethod
+from email.message import Message
+# Interfaces
+from .iemail_parser import IEmailParser
+# Constants
 from config.email_parser_constants import EmailParserConstants
 from config.email_constants import *
+# Personal libraries
 from utils.file_content_extractor import FileContentExtractor
-
-from .iemail_parser import IEmailParser
 from utils.string_cleaner import StringCleaner
 from utils.date_transformer import DateTransformer
 from utils.logging_setup import log_email_parser_info, log_email_parser_debug, log_email_parser_warning
@@ -79,10 +83,9 @@ class EmailParser(IEmailParser):
         attachments = []
         for part in msg.walk():
             content_disposition = part.get('Content-Disposition')
-            if part.get_content_maintype() == 'multipart':
+            if self._is_multipart(part=part):
                 continue  # Skip multipart container, go deeper
-            elif content_disposition is None:
-                # This is the email body
+            elif self._is_body_part(part=part):
                 if part.get_content_type() in ["text/plain", "text/html"]:
                     charset = part.get_content_charset()
                     if charset:
@@ -124,6 +127,76 @@ class EmailParser(IEmailParser):
                     # Handle the case where content is None
                     print(f"Warning: Attachment {filename} has no content and was skipped.")
         return body, attachments
+
+    def _is_multipart(self, part) -> bool:
+        return part.get_content_maintype() == 'multipart'
+
+    def _is_multipart_mixed(self, part: Message) -> bool:
+        """
+        Checks if the email part is of type multipart/mixed.
+
+        multipart/mixed is used for emails that contain multiple parts of different types,
+        such as text, images, or attachments, all intended to be processed separately.
+
+        :param part: The email part to check.
+        :return: True if the part is multipart/mixed, False otherwise.
+        """
+        return part.get_content_type() == 'multipart/mixed'
+
+    def _is_multipart_alternative(self, part: Message) -> bool:
+        """
+        Checks if the email part is of type multipart/alternative.
+
+        multipart/alternative is used when the email contains different versions
+        of the same content, like plain text and HTML, where the recipient's client
+        chooses which one to display.
+
+        :param part: The email part to check.
+        :return: True if the part is multipart/alternative, False otherwise.
+        """
+        return part.get_content_type() == 'multipart/alternative'
+
+    def _is_multipart_related(self, part: Message) -> bool:
+        """
+        Checks if the email part is of type multipart/related.
+
+        multipart/related is used for emails where different parts are intended to be
+        displayed together, such as an HTML email with embedded images.
+
+        :param part: The email part to check.
+        :return: True if the part is multipart/related, False otherwise.
+        """
+        return part.get_content_type() == 'multipart/related'
+
+    def _is_multipart_form_data(self, part: Message) -> bool:
+        """
+        Checks if the email part is of type multipart/form-data.
+
+        multipart/form-data is typically used for forms that submit file uploads
+        and other binary data alongside text fields.
+
+        :param part: The email part to check.
+        :return: True if the part is multipart/form-data, False otherwise.
+        """
+        return part.get_content_type() == 'multipart/form-data'
+
+    def _is_multipart_signed(self, part: Message) -> bool:
+        """
+        Checks if the email part is of type multipart/signed.
+
+        multipart/signed is used to attach a digital signature to the email, ensuring
+        the integrity and authenticity of the message.
+
+        :param part: The email part to check.
+        :return: True if the part is multipart/signed, False otherwise.
+        """
+        return part.get_content_type() == 'multipart/signed'
+
+    def _is_body_part(self, part) -> bool:
+        # This is the email body
+        content_disposition = part.get('Content-Disposition')
+        return content_disposition is None
+
 
     def _download_attachment(self, content: Any, attachment_id: str, filename: str) -> None:
         try:

@@ -1,4 +1,7 @@
+# ifile_retriever.py
+# Libraries
 from abc import ABC, abstractmethod
+
 
 class IFileRetriever(ABC):
     """
@@ -20,6 +23,7 @@ class IFileRetriever(ABC):
         filepath_dict:
             Returns the dictionary containing categorized file paths.
     """
+
     @abstractmethod
     def retrieve_files_path(self) -> None:
         """
@@ -58,4 +62,3 @@ class IFileRetriever(ABC):
             and values as lists of file paths.
         """
         pass
-

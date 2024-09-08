@@ -153,7 +153,6 @@ class StringCleaner(IStringCleaner):
         """
         return os.path.isfile(path)
 
-    @abstractmethod
     def is_empty_var(self, variable: Any) -> bool:
         if variable is None:
             return True

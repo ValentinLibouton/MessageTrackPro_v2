@@ -1,10 +1,15 @@
+# mbox_extractor.py
+# Libraries
 import os
 import tempfile
 from typing import Iterator, List
-from aggregator.imbox_extractor import ImboxExtractor
-from config.system_config import SystemConfig
-from utils.logging_setup import log_mbox_extractor
 from concurrent.futures import ProcessPoolExecutor, as_completed
+# Interfaces
+from aggregator.imbox_extractor import ImboxExtractor
+# Constants
+from config.system_config import SystemConfig
+# Personal libraries
+from utils.logging_setup import log_mbox_extractor
 
 
 class MboxExtractor(ImboxExtractor):

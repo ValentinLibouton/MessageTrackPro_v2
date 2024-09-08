@@ -1,5 +1,8 @@
+# imbox_extractor.py
+# Libraries
 from abc import ABC, abstractmethod
 from typing import Iterator, List
+# Personal libraries
 from config.system_config import SystemConfig
 
 

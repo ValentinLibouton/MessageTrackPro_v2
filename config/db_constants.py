@@ -1,3 +1,4 @@
+# db_constants.py
 class DatabaseRetrieverConstants:
     """For DatabaseRetriever class"""
     EVERYWHERE_LOCALISATION = 'everywhere'

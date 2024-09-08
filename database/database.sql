@@ -1,3 +1,4 @@
+-- database.sql
 CREATE TABLE IF NOT EXISTS Contacts (
     id INTEGER PRIMARY KEY,
     first_name TEXT COLLATE NOCASE,
