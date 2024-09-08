@@ -1,8 +1,13 @@
+# file_retriever.py
+# Libraries
 import os
-from aggregator.file_detector import FileDetector
+# Interfaces
 from aggregator.ifile_retriever import IFileRetriever
-from utils.logging_setup import log_file_retriever
+# Constants
 from config.file_constants import FileConstants
+# Personal libraries
+from aggregator.file_detector import FileDetector
+from utils.logging_setup import log_file_retriever
 
 
 class FileRetriever(IFileRetriever):

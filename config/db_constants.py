@@ -1,12 +1,20 @@
+# db_constants.py
 class DatabaseRetrieverConstants:
     """For DatabaseRetriever class"""
-    WORDS_LOCALIZATION: str = 'words_localization'
-    KEYWORD_SEARCH_FIELDS: list[str] = ['everywhere', 'contact', 'alias', 'address', 'subject', 'body',
-                                        'attachment_name', 'attachment']
-    EVERYWHERE_LOCALISATION: str = 'everywhere'
+    EVERYWHERE_LOCALISATION = 'everywhere'
+    CONTACT = 'contact'
+    ALIAS = 'alias'
+    ADDRESS = 'address'
+    SUBJECT = 'subject'
+    BODY = 'body'
+    ATTACHMENT_NAME = 'attachment_name'
+    ATTACHMENT = 'attachment'
+    KEYWORD_SEARCH_FIELDS: list[str] = [EVERYWHERE_LOCALISATION, CONTACT, ALIAS, ADDRESS, SUBJECT, BODY,
+                                        ATTACHMENT_NAME, ATTACHMENT]
+
     DEFAULT_WORD_OPERATOR: str = 'OR'
-    START_DATE: str = 'start_date'
-    END_DATE: str = 'end_date'
+
+
 
 class DBConstants:
     DB_NAME: str = 'database.db'
@@ -17,7 +25,10 @@ class DBConstants:
 
     # CONTACTS
     CONTACTS_TABLE: str = 'Contacts'
-    CONTACTS_COLUMNS: list[str] = ['first_name', 'last_name']
+    FIRST_NAME = 'first_name'
+    LAST_NAME = 'last_name'
+    CONTACTS_COLUMNS: list[str] = [FIRST_NAME, LAST_NAME]
+
 
     # Alias
     ALIAS_TABLE: str = 'Alias'

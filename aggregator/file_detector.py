@@ -1,4 +1,7 @@
+# file_detector.py
+# Interfaces
 from aggregator.ifile_detector import IFileDetector
+# Constants
 from config.file_constants import FileConstants
 
 

@@ -1,3 +1,4 @@
+# system_config.py
 class SystemConfig:
     """
     Configuration settings for system performance related parameters.

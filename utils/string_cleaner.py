@@ -1,4 +1,6 @@
 import os.path
+from abc import abstractmethod
+from typing import Any
 
 from .istring_cleaner import IStringCleaner
 class StringCleaner(IStringCleaner):
@@ -150,3 +152,10 @@ class StringCleaner(IStringCleaner):
         :return: True if the file exists, False otherwise.
         """
         return os.path.isfile(path)
+
+    def is_empty_var(self, variable: Any) -> bool:
+        if variable is None:
+            return True
+        if isinstance(variable, (str, list, tuple, set, dict)):
+            return len(variable) == 0
+        return False
